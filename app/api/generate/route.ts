@@ -100,7 +100,7 @@ export async function POST(request: NextRequest) {
             ],
           },
         ],
-        modalities: ['image','text']
+        modalities: ['image']
       }),
     });
 
