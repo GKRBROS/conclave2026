@@ -1,9 +1,7 @@
 import sharp from 'sharp';
 import { join } from 'path';
-import { mkdir, writeFile, readFile } from 'fs/promises';
+import { mkdir, writeFile } from 'fs/promises';
 import { put } from '@vercel/blob';
-
-let fontBase64Cache: string | null = null;
 
 export async function mergeImages(
   generatedImagePath: string,
@@ -11,20 +9,6 @@ export async function mergeImages(
   name?: string,
   designation?: string
 ): Promise<string> {
-  // Set FontConfig for Vercel
-  if (process.env.NODE_ENV === 'production') {
-    const fontDir = join(process.cwd(), 'fonts');
-    process.env.FONTCONFIG_PATH = fontDir;
-    process.env.PANGOCAIRO_BACKEND = 'fontconfig';
-    console.log(`Setting FONTCONFIG_PATH to: ${fontDir}`);
-
-    // Ensure cache dir exists
-    const cacheDir = '/tmp/fonts-cache';
-    try {
-      await mkdir(cacheDir, { recursive: true });
-    } catch (e) { }
-  }
-
   try {
     console.log('--- MERGE IMAGES DEBUG START ---');
     console.log('generatedImagePath:', generatedImagePath);
@@ -108,7 +92,7 @@ export async function mergeImages(
       // Cal Sans for name (approx 64px)
       // Geist for designation (approx 36px, -4% kerning)
       const nameText = name ? name.toUpperCase() : '';
-      const desText = designation ? designation : '';
+      const desText = designation ? designation.toLowerCase().replace(/\b\w/g, (char) => char.toUpperCase()) : '';
 
       // Auto-scaling logic: start with larger base size and scale down
       const maxWidth = 900; // Visible banner width
@@ -131,40 +115,19 @@ export async function mergeImages(
       const nameY = Math.floor(svgHeight * 0.752);
       const desY = Math.floor(svgHeight * 0.784);
 
-      // Load font if not cached
-      if (!fontBase64Cache) {
-        try {
-          // Explicit path resolution for Vercel and Local
-          const fontPath = join(process.cwd(), 'public', 'CalSans-SemiBold.ttf');
-          console.log(`Attempting to load font from: ${fontPath}`);
-          const fontBuffer = await readFile(fontPath);
-          fontBase64Cache = fontBuffer.toString('base64');
-          console.log('Font successfully loaded and cached as Base64 (Size:', fontBuffer.length, 'bytes)');
-        } catch (err) {
-          console.error('CRITICAL: Failed to load font for inlining:', err);
-          // Don't throw, but text might look different
-        }
-      }
+      // Use system fonts that are guaranteed to be available on Vercel
+      // This is the most reliable approach for serverless environments
+      console.log('Using system fonts for maximum Vercel compatibility');
 
       const svgOverlay = `
         <svg width="${svgWidth}" height="${svgHeight}" viewBox="0 0 ${svgWidth} ${svgHeight}" xmlns="http://www.w3.org/2000/svg">
-          <defs>
-            ${fontBase64Cache ? `
-            <style>
-              @font-face {
-                font-family: "Cal Sans";
-                src: url("data:application/x-font-ttf;base64,${fontBase64Cache}");
-              }
-            </style>
-            ` : ''}
-          </defs>
           <text 
             x="${svgWidth / 2}" 
             y="${nameY}" 
             fill="#000000" 
-            font-family="'Cal Sans', 'DejaVu Sans', 'Arial', sans-serif" 
+            font-family="Arial Black, Impact, DejaVu Sans, Arial, sans-serif" 
             font-size="${Math.max(nameFontSize, 24)}" 
-            font-weight="800" 
+            font-weight="900" 
             text-anchor="middle" 
             dominant-baseline="middle"
             ${nameEstimatedWidth > maxWidth ? `textLength="${maxWidth}" lengthAdjust="spacingAndGlyphs"` : ''}
@@ -173,12 +136,12 @@ export async function mergeImages(
             x="${svgWidth / 2}" 
             y="${desY}" 
             fill="#222222" 
-            font-family="'Geist', 'Inter', 'DejaVu Sans', 'Arial', sans-serif" 
+            font-family="Arial, Helvetica, DejaVu Sans, sans-serif" 
             font-size="${Math.max(desFontSize, 18)}" 
-            font-weight="500" 
+            font-weight="600" 
             text-anchor="middle" 
             dominant-baseline="middle"
-            letter-spacing="-0.04em"
+            letter-spacing="-0.02em"
             ${desEstimatedWidth > maxWidth ? `textLength="${maxWidth}" lengthAdjust="spacingAndGlyphs"` : ''}
           >${desText}</text>
         </svg>

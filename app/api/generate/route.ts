@@ -100,14 +100,19 @@ export async function POST(request: NextRequest) {
             ],
           },
         ],
-        modalities: ['image', 'text']
+        modalities: ['image','text']
       }),
     });
 
     if (!apiResponse.ok) {
       console.timeEnd('OpenRouter_AI_Call');
-      const errorData = await apiResponse.json();
-      throw new Error(`OpenRouter Error: ${apiResponse.status}`);
+      let errorDetail = 'Unknown error';
+      try {
+        const errorData = await apiResponse.json();
+        errorDetail = JSON.stringify(errorData);
+        console.error('OpenRouter API Error Details:', errorDetail);
+      } catch (e) { }
+      throw new Error(`OpenRouter Error ${apiResponse.status}: ${errorDetail}`);
     }
 
     const result = await apiResponse.json();
