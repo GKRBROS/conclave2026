@@ -14,11 +14,15 @@ export async function mergeImages(
     console.log('Text Overlay:', { name, designation });
 
     // Create output directory
-    const outputDir = join(process.cwd(), 'public', 'final');
+    const isProduction = process.env.NODE_ENV === 'production';
+    const publicOutputDir = join(process.cwd(), 'public', 'final');
+    const tmpOutputDir = join('/tmp', 'final');
+    const outputDir = isProduction ? tmpOutputDir : publicOutputDir;
+
     try {
       await mkdir(outputDir, { recursive: true });
     } catch (error) {
-      // Directory might already exist
+      // Directory might already exist or be read-only
     }
 
     // Load background image
