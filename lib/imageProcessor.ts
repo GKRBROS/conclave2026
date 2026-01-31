@@ -1,7 +1,7 @@
 import sharp from 'sharp';
 import { join } from 'path';
 import { mkdir, writeFile } from 'fs/promises';
-import { put } from '@vercel/blob';
+import { getSupabaseClient } from '@/lib/supabase';
 
 export async function mergeImages(
   generatedImagePath: string,
@@ -178,16 +178,28 @@ export async function mergeImages(
       }
     }
 
-    // Upload to Vercel Blob if token is available
-    if (process.env.BLOB_READ_WRITE_TOKEN) {
-      console.time('Vercel_Blob_Upload_Final');
-      const blob = await put(`posters/${outputFilename}`, finalBuffer, {
-        access: 'public',
-        contentType: 'image/png',
-      });
-      console.timeEnd('Vercel_Blob_Upload_Final');
-      console.log('Uploaded to Vercel Blob:', blob.url);
-      return blob.url;
+    // Upload final image to Supabase in production so it can be previewed and downloaded
+    if (isProduction) {
+      const supabase = getSupabaseClient();
+      const { error: uploadError } = await supabase.storage
+        .from('generated-images')
+        .upload(`final/${outputFilename}`, finalBuffer, {
+          contentType: 'image/png',
+          upsert: true,
+        });
+
+      if (uploadError) {
+        console.error('Supabase final upload error:', uploadError);
+        throw new Error('Failed to upload final image');
+      }
+
+      const { data: { publicUrl } } = supabase.storage
+        .from('generated-images')
+        .getPublicUrl(`final/${outputFilename}`);
+
+      console.log('Final image uploaded:', publicUrl);
+      console.log('--- MERGE IMAGES DEBUG END - SUCCESS ---');
+      return publicUrl;
     }
 
     console.log('--- MERGE IMAGES DEBUG END - SUCCESS ---');

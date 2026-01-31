@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { writeFile, mkdir } from 'fs/promises';
 import { join } from 'path';
 import { mergeImages } from '@/lib/imageProcessor';
-import { put } from '@vercel/blob';
+import { getSupabaseClient } from '@/lib/supabase';
 import OpenAI from 'openai';
 import sharp from 'sharp';
 
@@ -49,14 +49,24 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Upload to Blob only in development or if explicitly disabled for production speed
-    if (process.env.BLOB_READ_WRITE_TOKEN && !isProduction) {
-      console.log('Uploading input to Vercel Blob (Dev Only)...');
-      const blob = await put(`uploads/${filename}`, buffer, {
-        access: 'public',
+    const supabase = getSupabaseClient();
+
+    // Upload to Supabase Storage
+    console.log('Uploading input to Supabase Storage...');
+    const { data: uploadData, error: uploadError } = await supabase.storage
+      .from('generated-images')
+      .upload(`uploads/${filename}`, buffer, {
         contentType: image.type,
+        upsert: false
       });
-      uploadedImageUrl = blob.url;
+
+    if (uploadError) {
+      console.error('Supabase upload error:', uploadError);
+    } else {
+      const { data: { publicUrl } } = supabase.storage
+        .from('generated-images')
+        .getPublicUrl(`uploads/${filename}`);
+      uploadedImageUrl = publicUrl;
     }
 
     // Resize image for OpenRouter
@@ -154,25 +164,51 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Upload to Blob only in development or if explicitly disabled for production speed
-    if (process.env.BLOB_READ_WRITE_TOKEN && !isProduction) {
-      console.log('Uploading generated image to Vercel Blob (Dev Only)...');
-      const blob = await put(`generated/${generatedFilename}`, imageBuffer, {
-        access: 'public',
+    // Upload to Supabase Storage
+    console.log('Uploading generated image to Supabase Storage...');
+    const { data: genData, error: genError } = await supabase.storage
+      .from('generated-images')
+      .upload(`generated/${generatedFilename}`, imageBuffer, {
         contentType: 'image/png',
+        upsert: false
       });
-      finalGeneratedUrl = blob.url;
+
+    if (genError) {
+      console.error('Supabase generated upload error:', genError);
+    } else {
+      const { data: { publicUrl } } = supabase.storage
+        .from('generated-images')
+        .getPublicUrl(`generated/${generatedFilename}`);
+      finalGeneratedUrl = publicUrl;
     }
 
     // Merge with background
     // Pass the /tmp path for processing
     const finalImagePath = await mergeImages(tempGeneratedFile, timestamp.toString(), name, designation);
 
+    // Save metadata to Supabase database
+    const { data: dbData, error: dbError } = await supabase
+      .from('generations')
+      .insert({
+        name: name || 'Unknown',
+        designation: designation || 'Unknown',
+        image_url: finalImagePath
+      })
+      .select()
+      .single();
+
+    if (dbError) {
+      console.error('Database insert error:', dbError);
+    } else {
+      console.log('Saved to database:', dbData);
+    }
+
     return NextResponse.json({
       success: true,
       uploadedImage: uploadedImageUrl,
       generatedImage: finalGeneratedUrl,
       finalImage: finalImagePath,
+      dbId: dbData?.id
     });
   } catch (error: any) {
     console.error('CRITICAL ERROR during generation:', error);
