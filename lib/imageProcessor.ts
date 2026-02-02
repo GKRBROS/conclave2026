@@ -84,22 +84,18 @@ export async function mergeImages(
     ];
 
     if (name || designation) {
-      // Create SVG overlay for text
-      // Positioning based on the white banner in the reference (approx bottom 1/4)
+      // Create SVG overlay for text with proper XML formatting
       const svgWidth = bgWidth;
       const svgHeight = bgHeight;
 
-      // Cal Sans for name (approx 64px)
-      // Geist for designation (approx 36px, -4% kerning)
       const nameText = name ? name.toUpperCase() : '';
       const desText = designation ? designation.toLowerCase().replace(/\b\w/g, (char) => char.toUpperCase()) : '';
 
-      // Auto-scaling logic: start with larger base size and scale down
-      const maxWidth = 900; // Visible banner width
+      // Auto-scaling logic
+      const maxWidth = 900;
       const baseNameSize = 80;
       const baseDesSize = 42;
 
-      // Estimate character widths (approximate for sans-serif)
       const nameEstimatedWidth = nameText.length * (baseNameSize * 0.6);
       const nameFontSize = nameEstimatedWidth > maxWidth
         ? Math.floor(baseNameSize * (maxWidth / nameEstimatedWidth))
@@ -110,47 +106,28 @@ export async function mergeImages(
         ? Math.floor(baseDesSize * (maxWidth / desEstimatedWidth))
         : baseDesSize;
 
-      // Precise coordinates for the center of the white banner area
-      // Final Micro adjustment: 0.755 -> 0.752, 0.787 -> 0.784 (another 0.3% up)
       const nameY = Math.floor(svgHeight * 0.752);
       const desY = Math.floor(svgHeight * 0.784);
 
-      // Use system fonts that are guaranteed to be available on Vercel
-      // This is the most reliable approach for serverless environments
-      console.log('Using system fonts for maximum Vercel compatibility');
+      console.log('Text overlay:', { nameText, desText, nameFontSize, desFontSize, nameY, desY });
 
-      const svgOverlay = `
-        <svg width="${svgWidth}" height="${svgHeight}" viewBox="0 0 ${svgWidth} ${svgHeight}" xmlns="http://www.w3.org/2000/svg">
-          <text 
-            x="${svgWidth / 2}" 
-            y="${nameY}" 
-            fill="#000000" 
-            font-family="Arial Black, Impact, DejaVu Sans, Arial, sans-serif" 
-            font-size="${Math.max(nameFontSize, 24)}" 
-            font-weight="900" 
-            text-anchor="middle" 
-            dominant-baseline="middle"
-            ${nameEstimatedWidth > maxWidth ? `textLength="${maxWidth}" lengthAdjust="spacingAndGlyphs"` : ''}
-          >${nameText}</text>
-          <text 
-            x="${svgWidth / 2}" 
-            y="${desY}" 
-            fill="#222222" 
-            font-family="Arial, Helvetica, DejaVu Sans, sans-serif" 
-            font-size="${Math.max(desFontSize, 18)}" 
-            font-weight="600" 
-            text-anchor="middle" 
-            dominant-baseline="middle"
-            letter-spacing="-0.02em"
-            ${desEstimatedWidth > maxWidth ? `textLength="${maxWidth}" lengthAdjust="spacingAndGlyphs"` : ''}
-          >${desText}</text>
-        </svg>
-      `;
-      console.log('SVG Overlay Length:', svgOverlay.length);
-      console.log('SVG Sample:', svgOverlay.substring(0, 300) + '...');
+      // Create properly formatted SVG string without leading whitespace
+      let svgContent = `<svg width="${svgWidth}" height="${svgHeight}" xmlns="http://www.w3.org/2000/svg">`;
+      
+      if (nameText) {
+        svgContent += `<text x="${Math.floor(svgWidth / 2)}" y="${nameY}" fill="#000000" font-family="Arial, sans-serif" font-size="${Math.max(nameFontSize, 24)}" font-weight="900" text-anchor="middle" dominant-baseline="middle">${nameText}</text>`;
+      }
+      
+      if (desText) {
+        svgContent += `<text x="${Math.floor(svgWidth / 2)}" y="${desY}" fill="#222222" font-family="Arial, sans-serif" font-size="${Math.max(desFontSize, 18)}" font-weight="600" text-anchor="middle" dominant-baseline="middle">${desText}</text>`;
+      }
+      
+      svgContent += `</svg>`;
+
+      console.log('SVG content:', svgContent.substring(0, 200) + '...');
 
       finalCompositeLayers.push({
-        input: Buffer.from(svgOverlay),
+        input: Buffer.from(svgContent),
         top: 0,
         left: 0,
         blend: 'over'
