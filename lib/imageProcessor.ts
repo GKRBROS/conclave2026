@@ -1,8 +1,31 @@
 import sharp from 'sharp';
 import { join } from 'path';
+import { existsSync } from 'fs';
 import { mkdir, writeFile } from 'fs/promises';
 import { getSupabaseClient } from '@/lib/supabase';
-import { createCanvas } from 'canvas';
+import { createCanvas, registerFont } from 'canvas';
+
+let fontsRegistered = false;
+
+const registerCanvasFonts = () => {
+  if (fontsRegistered) return;
+
+  const calSansPath = join(process.cwd(), 'public', 'CalSans-SemiBold.ttf');
+  if (existsSync(calSansPath)) {
+    registerFont(calSansPath, { family: 'Cal Sans', weight: '600', style: 'normal' });
+  } else {
+    console.warn('Cal Sans font file not found:', calSansPath);
+  }
+
+  const geistPath = join(process.cwd(), 'public', 'Geist-Regular.ttf');
+  if (existsSync(geistPath)) {
+    registerFont(geistPath, { family: 'Geist', weight: '400', style: 'normal' });
+  } else {
+    console.warn('Geist font file not found:', geistPath);
+  }
+
+  fontsRegistered = true;
+};
 
 export async function mergeImages(
   generatedImagePath: string,
@@ -94,8 +117,8 @@ export async function mergeImages(
 
       // Auto-scaling logic
       const maxWidth = 900;
-      const baseNameSize = 80;
-      const baseDesSize = 42;
+      const baseNameSize = 64;
+      const baseDesSize = 36;
 
       const nameEstimatedWidth = nameText.length * (baseNameSize * 0.6);
       const nameFontSize = nameEstimatedWidth > maxWidth
@@ -114,25 +137,66 @@ export async function mergeImages(
 
       // Create canvas with text using node-canvas
       try {
+        registerCanvasFonts();
         const canvas = createCanvas(canvasWidth, canvasHeight);
         const ctx = canvas.getContext('2d');
 
-        // Draw name text
-        if (nameText) {
-          ctx.font = `900 ${Math.max(nameFontSize, 24)}px Arial, sans-serif`;
-          ctx.fillStyle = '#000000';
-          ctx.textAlign = 'center';
+        const drawTextWithKerning = (
+          text: string,
+          x: number,
+          y: number,
+          font: string,
+          color: string,
+          letterSpacingPx = 0
+        ) => {
+          ctx.font = font;
+          ctx.fillStyle = color;
+          ctx.textAlign = 'left';
           ctx.textBaseline = 'middle';
-          ctx.fillText(nameText, Math.floor(canvasWidth / 2), nameY);
+
+          if (!letterSpacingPx) {
+            const textWidth = ctx.measureText(text).width;
+            ctx.fillText(text, x - textWidth / 2, y);
+            return;
+          }
+
+          let totalWidth = 0;
+          for (const char of text) {
+            totalWidth += ctx.measureText(char).width + letterSpacingPx;
+          }
+          totalWidth -= letterSpacingPx;
+
+          let currentX = x - totalWidth / 2;
+          for (const char of text) {
+            ctx.fillText(char, currentX, y);
+            currentX += ctx.measureText(char).width + letterSpacingPx;
+          }
+        };
+
+        // Draw name text (Cal Sans, size 64 max)
+        if (nameText) {
+          const fontSize = Math.max(nameFontSize, 24);
+          drawTextWithKerning(
+            nameText,
+            Math.floor(canvasWidth / 2),
+            nameY,
+            `600 ${fontSize}px "Cal Sans", Arial, sans-serif`,
+            '#000000'
+          );
         }
 
-        // Draw designation text
+        // Draw designation text (Geist, size 36 max, kerning -4%)
         if (desText) {
-          ctx.font = `600 ${Math.max(desFontSize, 18)}px Arial, sans-serif`;
-          ctx.fillStyle = '#222222';
-          ctx.textAlign = 'center';
-          ctx.textBaseline = 'middle';
-          ctx.fillText(desText, Math.floor(canvasWidth / 2), desY);
+          const fontSize = Math.max(desFontSize, 18);
+          const letterSpacingPx = -0.04 * fontSize;
+          drawTextWithKerning(
+            desText,
+            Math.floor(canvasWidth / 2),
+            desY,
+            `400 ${fontSize}px "Geist", Arial, sans-serif`,
+            '#222222',
+            letterSpacingPx
+          );
         }
 
         const textBuffer = canvas.toBuffer('image/png');
@@ -152,11 +216,11 @@ export async function mergeImages(
         let svgContent = `<svg width="${svgWidth}" height="${svgHeight}" xmlns="http://www.w3.org/2000/svg"><defs><style>text { font-family: Arial, sans-serif; }</style></defs>`;
         
         if (nameText) {
-          svgContent += `<text x="${Math.floor(svgWidth / 2)}" y="${nameY}" fill="#000000" font-size="${Math.max(nameFontSize, 24)}" font-weight="900" text-anchor="middle" dominant-baseline="middle">${nameText}</text>`;
+          svgContent += `<text x="${Math.floor(svgWidth / 2)}" y="${nameY}" fill="#000000" font-size="${Math.max(nameFontSize, 24)}" font-weight="600" font-family="Cal Sans, Arial, sans-serif" text-anchor="middle" dominant-baseline="middle">${nameText}</text>`;
         }
         
         if (desText) {
-          svgContent += `<text x="${Math.floor(svgWidth / 2)}" y="${desY}" fill="#222222" font-size="${Math.max(desFontSize, 18)}" font-weight="600" text-anchor="middle" dominant-baseline="middle">${desText}</text>`;
+          svgContent += `<text x="${Math.floor(svgWidth / 2)}" y="${desY}" fill="#222222" font-size="${Math.max(desFontSize, 18)}" font-weight="400" font-family="Geist, Arial, sans-serif" letter-spacing="-0.04em" text-anchor="middle" dominant-baseline="middle">${desText}</text>`;
         }
         
         svgContent += `</svg>`;
