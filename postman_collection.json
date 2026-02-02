@@ -1,0 +1,227 @@
+{
+  "info": {
+    "name": "AI Image Generation API",
+    "description": "Arcane-style superhero portrait generator API",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "http://localhost:3000",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "Generate AI Image",
+      "request": {
+        "method": "POST",
+        "header": [],
+        "body": {
+          "mode": "formdata",
+          "formdata": [
+            {
+              "key": "photo",
+              "type": "file",
+              "src": "/path/to/image.jpg",
+              "description": "Image file (JPEG, PNG, WEBP, max 10MB)"
+            },
+            {
+              "key": "name",
+              "value": "John Doe",
+              "type": "text",
+              "description": "User's full name (required)"
+            },
+            {
+              "key": "edit_name",
+              "value": "J. Doe",
+              "type": "text",
+              "description": "Alternative display name (optional)"
+            },
+            {
+              "key": "email",
+              "value": "john@example.com",
+              "type": "text",
+              "description": "Valid email address (required)"
+            },
+            {
+              "key": "phone_no",
+              "value": "+1234567890",
+              "type": "text",
+              "description": "Phone number 10-15 digits (required)"
+            },
+            {
+              "key": "designation",
+              "value": "Software Developer",
+              "type": "text",
+              "description": "Job title or role (required)"
+            }
+          ]
+        },
+        "url": {
+          "raw": "{{base_url}}/api/generate",
+          "host": ["{{base_url}}"],
+          "path": ["api", "generate"]
+        },
+        "description": "Upload a photo and generate an Arcane-style superhero portrait.\n\n**Processing Time:** 30-60 seconds\n\n**Validations:**\n- Image format: JPEG, PNG, WEBP only\n- Image size: Max 10MB\n- Email: Valid email format\n- Phone: 10-15 digits\n\n**Response:**\n```json\n{\n  \"success\": true,\n  \"user_id\": \"uuid\",\n  \"name\": \"John Doe\",\n  \"designation\": \"Software Developer\",\n  \"aws_key\": \"uploads/1234567890/upload-1234567890.jpg\",\n  \"photo_url\": \"https://...\",\n  \"generated_image_url\": \"https://...\",\n  \"final_image_url\": \"https://...\"\n}\n```"
+      },
+      "response": [
+        {
+          "name": "Success Response",
+          "originalRequest": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "photo",
+                  "type": "file",
+                  "src": "/path/to/image.jpg"
+                },
+                {
+                  "key": "name",
+                  "value": "John Doe",
+                  "type": "text"
+                },
+                {
+                  "key": "email",
+                  "value": "john@example.com",
+                  "type": "text"
+                },
+                {
+                  "key": "phone_no",
+                  "value": "1234567890",
+                  "type": "text"
+                },
+                {
+                  "key": "designation",
+                  "value": "Developer",
+                  "type": "text"
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{base_url}}/api/generate",
+              "host": ["{{base_url}}"],
+              "path": ["api", "generate"]
+            }
+          },
+          "status": "OK",
+          "code": 200,
+          "_postman_previewlanguage": "json",
+          "header": [
+            {
+              "key": "Content-Type",
+              "value": "application/json"
+            }
+          ],
+          "body": "{\n  \"success\": true,\n  \"user_id\": \"550e8400-e29b-41d4-a716-446655440000\",\n  \"name\": \"John Doe\",\n  \"designation\": \"Developer\",\n  \"aws_key\": \"uploads/1738512000000/upload-1738512000000.jpg\",\n  \"photo_url\": \"https://your-supabase.supabase.co/storage/v1/object/public/generated-images/uploads/1738512000000/upload-1738512000000.jpg\",\n  \"generated_image_url\": \"https://your-supabase.supabase.co/storage/v1/object/public/generated-images/generated/generated-1738512000000.png\",\n  \"final_image_url\": \"/final/final-1738512000000.png\"\n}"
+        },
+        {
+          "name": "Missing Required Field",
+          "originalRequest": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "photo",
+                  "type": "file",
+                  "src": "/path/to/image.jpg"
+                },
+                {
+                  "key": "name",
+                  "value": "John Doe",
+                  "type": "text"
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{base_url}}/api/generate",
+              "host": ["{{base_url}}"],
+              "path": ["api", "generate"]
+            }
+          },
+          "status": "Bad Request",
+          "code": 400,
+          "_postman_previewlanguage": "json",
+          "header": [
+            {
+              "key": "Content-Type",
+              "value": "application/json"
+            }
+          ],
+          "body": "{\n  \"error\": \"Valid email is required\"\n}"
+        }
+      ]
+    },
+    {
+      "name": "Get User Details",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{base_url}}/api/user/:userId",
+          "host": ["{{base_url}}"],
+          "path": ["api", "user", ":userId"],
+          "variable": [
+            {
+              "key": "userId",
+              "value": "550e8400-e29b-41d4-a716-446655440000",
+              "description": "User UUID from generate response"
+            }
+          ]
+        },
+        "description": "Retrieve user information and generated images by user ID.\n\n**Response:**\n```json\n{\n  \"success\": true,\n  \"user\": {\n    \"id\": \"uuid\",\n    \"name\": \"John Doe\",\n    \"edit_name\": \"J. Doe\",\n    \"email\": \"john@example.com\",\n    \"phone_no\": \"+1234567890\",\n    \"designation\": \"Software Developer\",\n    \"aws_key\": \"uploads/1234567890/upload-1234567890.jpg\",\n    \"photo_url\": \"https://...\",\n    \"generated_image_url\": \"https://...\",\n    \"created_at\": \"2026-02-02T12:34:56.789Z\"\n  }\n}\n```"
+      },
+      "response": [
+        {
+          "name": "Success Response",
+          "originalRequest": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/user/550e8400-e29b-41d4-a716-446655440000",
+              "host": ["{{base_url}}"],
+              "path": ["api", "user", "550e8400-e29b-41d4-a716-446655440000"]
+            }
+          },
+          "status": "OK",
+          "code": 200,
+          "_postman_previewlanguage": "json",
+          "header": [
+            {
+              "key": "Content-Type",
+              "value": "application/json"
+            }
+          ],
+          "body": "{\n  \"success\": true,\n  \"user\": {\n    \"id\": \"550e8400-e29b-41d4-a716-446655440000\",\n    \"name\": \"John Doe\",\n    \"edit_name\": \"J. Doe\",\n    \"email\": \"john@example.com\",\n    \"phone_no\": \"+1234567890\",\n    \"designation\": \"Software Developer\",\n    \"aws_key\": \"uploads/1738512000000/upload-1738512000000.jpg\",\n    \"photo_url\": \"https://your-supabase.supabase.co/storage/v1/object/public/generated-images/uploads/1738512000000/upload-1738512000000.jpg\",\n    \"generated_image_url\": \"https://your-supabase.supabase.co/storage/v1/object/public/generated-images/generated/generated-1738512000000.png\",\n    \"created_at\": \"2026-02-02T12:34:56.789Z\"\n  }\n}"
+        },
+        {
+          "name": "User Not Found",
+          "originalRequest": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/user/invalid-uuid",
+              "host": ["{{base_url}}"],
+              "path": ["api", "user", "invalid-uuid"]
+            }
+          },
+          "status": "Not Found",
+          "code": 404,
+          "_postman_previewlanguage": "json",
+          "header": [
+            {
+              "key": "Content-Type",
+              "value": "application/json"
+            }
+          ],
+          "body": "{\n  \"error\": \"User not found\"\n}"
+        }
+      ]
+    }
+  ]
+}
