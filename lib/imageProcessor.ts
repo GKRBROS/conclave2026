@@ -2,6 +2,7 @@ import sharp from 'sharp';
 import { join } from 'path';
 import { mkdir, writeFile } from 'fs/promises';
 import { getSupabaseClient } from '@/lib/supabase';
+import { createCanvas } from 'canvas';
 
 export async function mergeImages(
   generatedImagePath: string,
@@ -84,9 +85,9 @@ export async function mergeImages(
     ];
 
     if (name || designation) {
-      // Create SVG overlay for text with proper XML formatting
-      const svgWidth = bgWidth;
-      const svgHeight = bgHeight;
+      // Create text overlay using Canvas (better than SVG for text rendering)
+      const canvasWidth = bgWidth;
+      const canvasHeight = bgHeight;
 
       const nameText = name ? name.toUpperCase() : '';
       const desText = designation ? designation.toLowerCase().replace(/\b\w/g, (char) => char.toUpperCase()) : '';
@@ -106,32 +107,67 @@ export async function mergeImages(
         ? Math.floor(baseDesSize * (maxWidth / desEstimatedWidth))
         : baseDesSize;
 
-      const nameY = Math.floor(svgHeight * 0.752);
-      const desY = Math.floor(svgHeight * 0.784);
+      const nameY = Math.floor(canvasHeight * 0.752);
+      const desY = Math.floor(canvasHeight * 0.784);
 
       console.log('Text overlay:', { nameText, desText, nameFontSize, desFontSize, nameY, desY });
 
-      // Create properly formatted SVG string without leading whitespace
-      let svgContent = `<svg width="${svgWidth}" height="${svgHeight}" xmlns="http://www.w3.org/2000/svg">`;
-      
-      if (nameText) {
-        svgContent += `<text x="${Math.floor(svgWidth / 2)}" y="${nameY}" fill="#000000" font-family="Arial, sans-serif" font-size="${Math.max(nameFontSize, 24)}" font-weight="900" text-anchor="middle" dominant-baseline="middle">${nameText}</text>`;
-      }
-      
-      if (desText) {
-        svgContent += `<text x="${Math.floor(svgWidth / 2)}" y="${desY}" fill="#222222" font-family="Arial, sans-serif" font-size="${Math.max(desFontSize, 18)}" font-weight="600" text-anchor="middle" dominant-baseline="middle">${desText}</text>`;
-      }
-      
-      svgContent += `</svg>`;
+      // Create canvas with text using node-canvas
+      try {
+        const canvas = createCanvas(canvasWidth, canvasHeight);
+        const ctx = canvas.getContext('2d');
 
-      console.log('SVG content:', svgContent.substring(0, 200) + '...');
+        // Draw name text
+        if (nameText) {
+          ctx.font = `900 ${Math.max(nameFontSize, 24)}px Arial, sans-serif`;
+          ctx.fillStyle = '#000000';
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+          ctx.fillText(nameText, Math.floor(canvasWidth / 2), nameY);
+        }
 
-      finalCompositeLayers.push({
-        input: Buffer.from(svgContent),
-        top: 0,
-        left: 0,
-        blend: 'over'
-      });
+        // Draw designation text
+        if (desText) {
+          ctx.font = `600 ${Math.max(desFontSize, 18)}px Arial, sans-serif`;
+          ctx.fillStyle = '#222222';
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+          ctx.fillText(desText, Math.floor(canvasWidth / 2), desY);
+        }
+
+        const textBuffer = canvas.toBuffer('image/png');
+        console.log('Canvas text overlay created, buffer size:', textBuffer.length);
+
+        finalCompositeLayers.push({
+          input: textBuffer,
+          top: 0,
+          left: 0,
+          blend: 'over'
+        });
+      } catch (canvasErr) {
+        console.warn('Canvas text rendering failed, falling back to SVG:', canvasErr);
+        // Fallback to SVG if canvas fails
+        const svgWidth = bgWidth;
+        const svgHeight = bgHeight;
+        let svgContent = `<svg width="${svgWidth}" height="${svgHeight}" xmlns="http://www.w3.org/2000/svg"><defs><style>text { font-family: Arial, sans-serif; }</style></defs>`;
+        
+        if (nameText) {
+          svgContent += `<text x="${Math.floor(svgWidth / 2)}" y="${nameY}" fill="#000000" font-size="${Math.max(nameFontSize, 24)}" font-weight="900" text-anchor="middle" dominant-baseline="middle">${nameText}</text>`;
+        }
+        
+        if (desText) {
+          svgContent += `<text x="${Math.floor(svgWidth / 2)}" y="${desY}" fill="#222222" font-size="${Math.max(desFontSize, 18)}" font-weight="600" text-anchor="middle" dominant-baseline="middle">${desText}</text>`;
+        }
+        
+        svgContent += `</svg>`;
+        
+        finalCompositeLayers.push({
+          input: Buffer.from(svgContent),
+          top: 0,
+          left: 0,
+          blend: 'over'
+        });
+      }
     }
 
     const finalBuffer = await sharp(backgroundPath)
