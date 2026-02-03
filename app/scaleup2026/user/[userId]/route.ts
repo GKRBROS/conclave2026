@@ -22,7 +22,7 @@ export async function GET(
     // Fetch user details from database
     const { data, error } = await supabase
       .from('generations')
-      .select('id, name, designation, aws_key, photo_url, generated_image_url, email, phone_no, edit_name, created_at')
+      .select('id, name, email, phone_no, designation, generated_image_url, created_at')
       .eq('id', userId)
       .single();
 
@@ -40,19 +40,16 @@ export async function GET(
       );
     }
 
-    // Return user details
+    // Return user details with final image
     return NextResponse.json({
       success: true,
       user: {
         id: data.id,
         name: data.name,
-        edit_name: data.edit_name,
         email: data.email,
         phone_no: data.phone_no,
         designation: data.designation,
-        aws_key: data.aws_key,
-        photo_url: data.photo_url,
-        generated_image_url: data.generated_image_url,
+        final_image_url: data.generated_image_url,
         created_at: data.created_at
       }
     });
