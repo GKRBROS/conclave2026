@@ -46,7 +46,6 @@ export async function GET(
       user: {
         id: data.id,
         name: data.name,
-        edit_name: data.edit_name,
         email: data.email,
         phone_no: data.phone_no,
         designation: data.designation,
