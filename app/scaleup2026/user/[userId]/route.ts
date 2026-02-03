@@ -22,7 +22,7 @@ export async function GET(
     // Fetch user details from database
     const { data, error } = await supabase
       .from('generations')
-      .select('id, name, designation, aws_key, photo_url, generated_image_url, email, phone_no, edit_name, created_at')
+      .select('id, name, designation, aws_key, photo_url, generated_image_url, email, phone_no, edit_name, prompt_type, created_at')
       .eq('id', userId)
       .single();
 
@@ -49,6 +49,7 @@ export async function GET(
         email: data.email,
         phone_no: data.phone_no,
         aws_key: data.aws_key,
+        prompt_type: data.prompt_type,
         final_image_url: data.generated_image_url,
         created_at: data.created_at
       }

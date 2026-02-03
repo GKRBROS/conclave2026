@@ -116,6 +116,15 @@ BEGIN
   END IF;
 END $$;
 
+-- Add prompt_type column if it doesn't exist
+DO $$ 
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns 
+                 WHERE table_schema='public' AND table_name='generations' AND column_name='prompt_type') THEN
+    ALTER TABLE public.generations ADD COLUMN prompt_type TEXT;
+  END IF;
+END $$;
+
 -- Add updated_at column if it doesn't exist
 DO $$ 
 BEGIN
@@ -159,6 +168,18 @@ BEGIN
     CHECK (phone_no IS NULL OR phone_no ~* '^\+?[0-9]{10,15}$');
 END $$;
 
+-- Add prompt_type constraint
+DO $$ 
+BEGIN
+  -- Drop old constraint if exists
+  IF EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'prompt_type_format') THEN
+    ALTER TABLE public.generations DROP CONSTRAINT prompt_type_format;
+  END IF;
+  -- Add new constraint
+  ALTER TABLE public.generations ADD CONSTRAINT prompt_type_format 
+    CHECK (prompt_type IN ('prompt1', 'prompt2', 'prompt3'));
+END $$;
+
 -- ============================================
 -- OR CREATE NEW TABLE (for fresh databases)
 -- ============================================
@@ -173,12 +194,14 @@ CREATE TABLE IF NOT EXISTS public.generations (
   photo_url TEXT NOT NULL,
   generated_image_url TEXT NOT NULL,
   aws_key TEXT,
+  prompt_type TEXT NOT NULL,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   
   -- Add constraints
   CONSTRAINT email_format CHECK (email ~* '^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$'),
-  CONSTRAINT phone_format CHECK (phone_no ~* '^\+?[0-9]{10,15}$')
+  CONSTRAINT phone_format CHECK (phone_no ~* '^\+?[0-9]{10,15}$'),
+  CONSTRAINT prompt_type_format CHECK (prompt_type IN ('prompt1', 'prompt2', 'prompt3'))
 );
 
 -- 5. Enable Row Level Security (RLS)

@@ -8,6 +8,13 @@ import sharp from 'sharp';
 
 export const maxDuration = 60; // Increase timeout for long AI generation
 
+// 3 AI prompts for image generation
+const PROMPTS = {
+  prompt1: "Transform this person into a superhero character with a sleek blue suit, red and yellow emblem on the chest, dramatic cape flowing in the wind. Use DC Comics style with bold colors, dramatic lighting, professional high-quality digital art. The background should be completely transparent with an alpha channel.",
+  prompt2: "Create a professional corporate portrait of this person in a tailored business suit, maintaining facial features, in an office setting with soft lighting and subtle gradient background, photorealistic style, professional high-quality digital photography. The background should be completely transparent with an alpha channel.",
+  prompt3: "Transform this person into an artistic creative portrait with vibrant colors, neon lighting effects, contemporary casual outfit, urban style, maintaining facial features, digital art style with bold composition. The background should be completely transparent with an alpha channel."
+};
+
 // Validation constants
 const MAX_IMAGE_SIZE = 2 * 1024 * 1024; // 2MB
 const ALLOWED_IMAGE_FORMATS = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
@@ -24,6 +31,7 @@ export async function POST(request: NextRequest) {
     const email = formData.get('email') as string;
     const phone_no = formData.get('phone_no') as string;
     const designation = formData.get('designation') as string;
+    const prompt_type = formData.get('prompt_type') as string;
 
     // Field validations
     if (!image) {
@@ -57,6 +65,14 @@ export async function POST(request: NextRequest) {
     if (!designation || designation.trim().length === 0) {
       return NextResponse.json(
         { error: 'Designation is required' },
+        { status: 400 }
+      );
+    }
+
+    // Prompt type validation
+    if (!prompt_type || !['prompt1', 'prompt2', 'prompt3'].includes(prompt_type)) {
+      return NextResponse.json(
+        { error: 'Valid prompt_type is required (prompt1, prompt2, or prompt3)' },
         { status: 400 }
       );
     }
@@ -145,8 +161,7 @@ export async function POST(request: NextRequest) {
     const dataUrl = `data:image/jpeg;base64,${base64Image}`;
 
     // Call OpenRouter
-    const prompt =
-      'Reimagine the uploaded person as a cinematic, high-end superhero portrait inspired by modern DC-style realism, presented as an upper-body portrait cropped from just below the waist to just above the head in a consistent 4:5 aspect ratio, with the subject placed slightly off-center and facing diagonally upward, the head subtly tilted up and to the side, eyes looking toward a bright light source above, conveying a strong yet calm posture with the chest slightly forward and shoulders relaxed, and an expression that feels hopeful, confident, and aspirational with a soft, determined smile and a composed heroic presence, never aggressive. Identity preservation is critical: maintain the person’s exact facial structure, proportions, and likeness with absolute accuracy, preserving all personal features exactly as they appear in the source image, including glasses (same style, shape, and placement), nose rings, earrings, piercings, tattoos (same design, placement, and visibility), scars, moles, freckles, birthmarks, and facial hair, without adding, removing, stylizing, idealizing, beautifying, or altering any personal features beyond realistic cinematic lighting, and without changing age, gender, ethnicity, or body proportions. If the uploaded image includes culturally, religiously, or personally significant garments or coverings such as a hijab, turban, dupatta, headscarf, veil, cap, or modest or symbolic clothing, the final image must retain equivalent coverage over the same areas of the body, with the superhero suit intelligently adapted to integrate these elements or provide appropriate coverage without removing, reducing, reinterpreting, or altering their meaning or purpose. The character wears a sleek, form-fitting deep blue superhero suit with premium textured fabric, realistic tension, and visible stitching, with the overall style randomly resembling either a heroic cloth-based design, a darker and heavier power-driven suit, or a tactical armored build, and featuring a bold red and yellow geometric emblem on the chest using an upward-pointing arrow as the symbol itself, seamlessly integrated into the suit. Lighting is dramatic and cinematic with a strong rim light from above and behind, warm golden highlights wrapping naturally around the face and upper torso, subtle light streaks and glow interacting realistically with the subject, smooth color gradients, and natural, accurate skin tones, rendered in a hyper-realistic, movie-poster quality style with ultra-sharp facial detail, visible skin texture, shallow depth of field, and the subject perfectly in focus. The background must be completely removed and delivered as a transparent PNG with a clean alpha channel showing only the character, ensuring clean edges with no halos, fringing, or artifacts, maintaining strict consistency across generations with the same pose, angle, framing, and lighting, and outputting in true 4K resolution with ultra-detailed clarity.';
+    const prompt = PROMPTS[prompt_type as keyof typeof PROMPTS];
 
     if (!process.env.OPENROUTER_API_KEY) {
       throw new Error('OPENROUTER_API_KEY not configured');
@@ -259,7 +274,8 @@ export async function POST(request: NextRequest) {
         designation: designation.trim(),
         photo_url: uploadedImageUrl,
         generated_image_url: finalGeneratedUrl,
-        aws_key: awsKey
+        aws_key: awsKey,
+        prompt_type: prompt_type
       })
       .select()
       .single();

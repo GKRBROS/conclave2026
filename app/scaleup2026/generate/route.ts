@@ -273,7 +273,8 @@ export async function POST(request: NextRequest) {
         designation: designation.trim(),
         photo_url: uploadedImageUrl,
         generated_image_url: finalGeneratedUrl,
-        aws_key: awsKey
+        aws_key: awsKey,
+        prompt_type: prompt_type
       })
       .select()
       .single();
