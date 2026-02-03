@@ -44,15 +44,8 @@ export async function GET(
     return NextResponse.json({
       success: true,
       user: {
-        id: data.id,
         name: data.name,
-        email: data.email,
-        phone_no: data.phone_no,
-        designation: data.designation,
-        aws_key: data.aws_key,
-        photo_url: data.photo_url,
-        generated_image_url: data.generated_image_url,
-        created_at: data.created_at
+        final_image_url: data.generated_image_url
       }
     });
   } catch (error: any) {
