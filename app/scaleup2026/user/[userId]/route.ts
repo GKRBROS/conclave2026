@@ -45,7 +45,12 @@ export async function GET(
       success: true,
       user: {
         name: data.name,
-        final_image_url: data.generated_image_url
+        designation: data.designation,
+        email: data.email,
+        phone_no: data.phone_no,
+        aws_key: data.aws_key,
+        final_image_url: data.generated_image_url,
+        created_at: data.created_at
       }
     });
   } catch (error: any) {
