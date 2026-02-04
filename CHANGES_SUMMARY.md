@@ -13,7 +13,6 @@ Transformed the Next.js web app into an API-only service with comprehensive vali
 **New Fields Added:**
 
 - `name` - User's full name (required)
-- `edit_name` - Alternative display name (optional)
 - `email` - Email address with validation (required)
 - `phone_no` - Phone number with validation (required)
 - `designation` - Job title/role (required)
@@ -46,7 +45,7 @@ Transformed the Next.js web app into an API-only service with comprehensive vali
 **Changes:**
 
 - ✅ Changed field name from `image` to `photo`
-- ✅ Added new fields: `edit_name`, `email`, `phone_no`
+- ✅ Added new fields: `email`, `phone_no`
 - ✅ Implemented comprehensive validations:
   - Image format validation (JPEG, PNG, WEBP only)
   - Image size validation (max 2MB)
@@ -63,7 +62,6 @@ Transformed the Next.js web app into an API-only service with comprehensive vali
 {
   photo: File,        // Required, JPEG/PNG/WEBP, max 2MB
   name: string,       // Required
-  edit_name: string,  // Optional
   email: string,      // Required, valid format
   phone_no: string,   // Required, 10-15 digits
   designation: string // Required
@@ -101,7 +99,6 @@ Transformed the Next.js web app into an API-only service with comprehensive vali
   "user": {
     "id": "uuid",
     "name": "John Doe",
-    "edit_name": "J. Doe",
     "email": "john@example.com",
     "phone_no": "+1234567890",
     "designation": "Developer",
@@ -220,7 +217,6 @@ project/
 curl -X POST http://localhost:3000/api/generate \
   -F "photo=@test-image.jpg" \
   -F "name=John Doe" \
-  -F "edit_name=J. Doe" \
   -F "email=john@example.com" \
   -F "phone_no=1234567890" \
   -F "designation=Software Developer"

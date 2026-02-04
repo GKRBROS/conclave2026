@@ -65,15 +65,6 @@ BEGIN
   END IF;
 END $$;
 
--- Add edit_name column if it doesn't exist
-DO $$ 
-BEGIN
-  IF NOT EXISTS (SELECT 1 FROM information_schema.columns 
-                 WHERE table_schema='public' AND table_name='generations' AND column_name='edit_name') THEN
-    ALTER TABLE public.generations ADD COLUMN edit_name TEXT;
-  END IF;
-END $$;
-
 -- Add phone_no column if it doesn't exist
 DO $$ 
 BEGIN
@@ -116,6 +107,15 @@ BEGIN
   IF EXISTS (SELECT 1 FROM information_schema.columns 
              WHERE table_schema='public' AND table_name='generations' AND column_name='designation') THEN
     ALTER TABLE public.generations DROP COLUMN designation;
+  END IF;
+END $$;
+
+-- Drop edit_name column if it exists (no longer used)
+DO $$ 
+BEGIN
+  IF EXISTS (SELECT 1 FROM information_schema.columns 
+             WHERE table_schema='public' AND table_name='generations' AND column_name='edit_name') THEN
+    ALTER TABLE public.generations DROP COLUMN edit_name;
   END IF;
 END $$;
 
@@ -240,7 +240,6 @@ END $$;
 CREATE TABLE IF NOT EXISTS public.generations (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
   name TEXT NOT NULL,
-  edit_name TEXT,
   email TEXT NOT NULL,
   phone_no TEXT NOT NULL,
   district TEXT NOT NULL,

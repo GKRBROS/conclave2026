@@ -8,14 +8,13 @@ POST /api/generate
 
 ### Request (multipart/form-data)
 
-| Field         | Type   | Required | Validation              |
-| ------------- | ------ | -------- | ----------------------- |
-| `photo`       | File   | ✅       | JPEG/PNG/WEBP, max 2MB  |
-| `name`        | string | ✅       | Non-empty               |
-| `edit_name`   | string | ❌       | Optional                |
-| `email`       | string | ✅       | Valid email format      |
-| `phone_no`    | string | ✅       | 10-15 digits            |
-| `designation` | string | ✅       | Non-empty               |
+| Field         | Type   | Required | Validation             |
+| ------------- | ------ | -------- | ---------------------- |
+| `photo`       | File   | ✅       | JPEG/PNG/WEBP, max 2MB |
+| `name`        | string | ✅       | Non-empty              |
+| `email`       | string | ✅       | Valid email format     |
+| `phone_no`    | string | ✅       | 10-15 digits           |
+| `designation` | string | ✅       | Non-empty              |
 
 ### cURL Example
 

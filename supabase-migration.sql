@@ -11,8 +11,8 @@
 -- Add email column
 ALTER TABLE public.generations ADD COLUMN IF NOT EXISTS email TEXT;
 
--- Add edit_name column
-ALTER TABLE public.generations ADD COLUMN IF NOT EXISTS edit_name TEXT;
+-- Drop edit_name column (no longer used)
+ALTER TABLE public.generations DROP COLUMN IF EXISTS edit_name;
 
 -- Add phone_no column
 ALTER TABLE public.generations ADD COLUMN IF NOT EXISTS phone_no TEXT;

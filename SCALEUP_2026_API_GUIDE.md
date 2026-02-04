@@ -8,14 +8,13 @@ POST /scaleup2026/generate
 
 ### Request (multipart/form-data)
 
-| Field         | Type   | Required | Validation              |
-| ------------- | ------ | -------- | ----------------------- |
-| `photo`       | File   | ✅       | JPEG/PNG/WEBP, max 2MB  |
-| `name`        | string | ✅       | Non-empty               |
-| `edit_name`   | string | ❌       | Optional                |
-| `email`       | string | ✅       | Valid email format      |
-| `phone_no`    | string | ✅       | 10-15 digits            |
-| `designation` | string | ✅       | Non-empty               |
+| Field         | Type   | Required | Validation             |
+| ------------- | ------ | -------- | ---------------------- |
+| `photo`       | File   | ✅       | JPEG/PNG/WEBP, max 2MB |
+| `name`        | string | ✅       | Non-empty              |
+| `email`       | string | ✅       | Valid email format     |
+| `phone_no`    | string | ✅       | 10-15 digits           |
+| `designation` | string | ✅       | Non-empty              |
 
 ### cURL Example
 
@@ -134,9 +133,11 @@ npm run dev
 ## 📚 API Endpoints
 
 ### POST /scaleup2026/generate
+
 Generate AI superhero portrait from user photo
 
 ### GET /scaleup2026/user/:userId
+
 Get user details and generated images by ID
 
 ---
@@ -176,15 +177,15 @@ Plan API timeouts accordingly!
 ```javascript
 // Generate Image
 const formData = new FormData();
-formData.append('photo', fileInput.files[0]);
-formData.append('name', 'John Doe');
-formData.append('email', 'john@example.com');
-formData.append('phone_no', '1234567890');
-formData.append('designation', 'Developer');
+formData.append("photo", fileInput.files[0]);
+formData.append("name", "John Doe");
+formData.append("email", "john@example.com");
+formData.append("phone_no", "1234567890");
+formData.append("designation", "Developer");
 
-const response = await fetch('http://localhost:3000/scaleup2026/generate', {
-  method: 'POST',
-  body: formData
+const response = await fetch("http://localhost:3000/scaleup2026/generate", {
+  method: "POST",
+  body: formData,
 });
 
 const result = await response.json();
@@ -192,7 +193,9 @@ console.log(result.user_id); // Save this ID
 
 // Get User Details
 const userId = result.user_id;
-const userResponse = await fetch(`http://localhost:3000/scaleup2026/user/${userId}`);
+const userResponse = await fetch(
+  `http://localhost:3000/scaleup2026/user/${userId}`,
+);
 const userData = await userResponse.json();
 console.log(userData.user);
 ```

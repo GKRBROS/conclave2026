@@ -39,9 +39,6 @@ export default function Home() {
                   <span className="text-red-600">*</span> <strong>name</strong>:
                   string
                 </li>
-                <li className="ml-4">
-                  <strong>edit_name</strong>: string (optional)
-                </li>
                 <li>
                   <span className="text-red-600">*</span> <strong>email</strong>
                   : string (valid email format)
@@ -111,7 +108,6 @@ export default function Home() {
   "user": {
     "id": "uuid",
     "name": "John Doe",
-    "edit_name": "J. Doe",
     "email": "john@example.com",
     "phone_no": "+1234567890",
     "designation": "Developer",
@@ -137,7 +133,6 @@ export default function Home() {
                 {`curl -X POST http://localhost:3000/api/generate \\
   -F "photo=@/path/to/image.jpg" \\
   -F "name=John Doe" \\
-  -F "edit_name=J. Doe" \\
   -F "email=john@example.com" \\
   -F "phone_no=+1234567890" \\
   -F "designation=Developer"`}

@@ -214,17 +214,17 @@ export async function mergeImages(
         const svgWidth = bgWidth;
         const svgHeight = bgHeight;
         let svgContent = `<svg width="${svgWidth}" height="${svgHeight}" xmlns="http://www.w3.org/2000/svg"><defs><style>text { font-family: Arial, sans-serif; }</style></defs>`;
-        
+
         if (nameText) {
           svgContent += `<text x="${Math.floor(svgWidth / 2)}" y="${nameY}" fill="#000000" font-size="${Math.max(nameFontSize, 24)}" font-weight="600" font-family="Cal Sans, Arial, sans-serif" text-anchor="middle" dominant-baseline="middle">${nameText}</text>`;
         }
-        
+
         if (desText) {
           svgContent += `<text x="${Math.floor(svgWidth / 2)}" y="${desY}" fill="#222222" font-size="${Math.max(desFontSize, 18)}" font-weight="400" font-family="Geist, Arial, sans-serif" letter-spacing="-0.04em" text-anchor="middle" dominant-baseline="middle">${desText}</text>`;
         }
-        
+
         svgContent += `</svg>`;
-        
+
         finalCompositeLayers.push({
           input: Buffer.from(svgContent),
           top: 0,

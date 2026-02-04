@@ -1,11 +1,13 @@
 # AI Image Generator API Documentation
 
 ## Overview
+
 This API handles user registration with avatar generation using AI. The system processes uploaded images through an AI model to create stylized avatars, which are then merged with backgrounds and returned to the user.
 
 ---
 
 ## Base URLs
+
 - **ScaleUp 2026 Endpoint**: `/scaleup2026/generate` (POST) and `/scaleup2026/user/[userId]` (GET)
 - **API Endpoint**: `/api/generate` (POST) and `/api/user/[userId]` (GET)
 
@@ -16,30 +18,33 @@ This API handles user registration with avatar generation using AI. The system p
 ## POST Endpoint: Generate Avatar
 
 ### Endpoint
+
 ```
 POST /scaleup2026/generate
 POST /api/generate
 ```
 
 ### Request Format
+
 **Content-Type**: `multipart/form-data`
 
 ### Request Parameters
 
-| Parameter | Type | Required | Description |
-|-----------|------|----------|-------------|
-| `name` | string | ✅ | User's full name (cannot be empty) |
-| `edit_name` | string | ❌ | Alternative/edited name for display |
-| `email` | string | ✅ | Valid email address (regex validated) |
-| `phone_no` | string | ✅ | Phone number (10-15 digits, with optional + prefix) |
-| `district` | string | ✅ | District/region name (cannot be empty) |
-| `category` | string | ✅ | User category (must be one of the 6 options below) |
-| `organization` | string | ✅ | Organization/company name (cannot be empty) |
-| `prompt_type` | string | ✅ | Avatar style type (must be one of: `prompt1`, `prompt2`, `prompt3`) |
-| `photo` | File | ✅ | User's photo for avatar generation |
+| Parameter      | Type   | Required | Description                                                         |
+| -------------- | ------ | -------- | ------------------------------------------------------------------- |
+| `name`         | string | ✅       | User's full name (cannot be empty)                                  |
+| `email`        | string | ✅       | Valid email address (regex validated)                               |
+| `phone_no`     | string | ✅       | Phone number (10-15 digits, with optional + prefix)                 |
+| `district`     | string | ✅       | District/region name (cannot be empty)                              |
+| `category`     | string | ✅       | User category (must be one of the 6 options below)                  |
+| `organization` | string | ✅       | Organization/company name (cannot be empty)                         |
+| `prompt_type`  | string | ✅       | Avatar style type (must be one of: `prompt1`, `prompt2`, `prompt3`) |
+| `photo`        | File   | ✅       | User's photo for avatar generation                                  |
 
 ### Category Options
+
 The `category` field must be one of these values:
+
 - `Startups`
 - `Working Professionals`
 - `Students`
@@ -48,34 +53,39 @@ The `category` field must be one of these values:
 - `Government Officials`
 
 ### Avatar Style Types
+
 The `prompt_type` field defines which AI prompt is used:
 
-| Value | Style | Description |
-|-------|-------|-------------|
-| `prompt1` | **Superman** | Cinematic superhero portrait with bold, heroic presence |
+| Value     | Style            | Description                                             |
+| --------- | ---------------- | ------------------------------------------------------- |
+| `prompt1` | **Superman**     | Cinematic superhero portrait with bold, heroic presence |
 | `prompt2` | **Professional** | Corporate professional portrait with refined aesthetics |
-| `prompt3` | **Warrior** | Medieval warrior portrait with historical authenticity |
+| `prompt3` | **Warrior**      | Medieval warrior portrait with historical authenticity  |
 
 ### File Upload Constraints
 
 #### Image Format Requirements
-**Allowed Formats**: 
+
+**Allowed Formats**:
+
 - `image/jpeg` (JPEG/JPG)
 - `image/png` (PNG)
-- `image/webp` (WebP)
 
 **Validation Error** (400):
+
 ```json
 {
   "error": "Invalid image format",
-  "details": "Only JPEG, PNG, and WebP formats are allowed. Received: image/gif"
+  "details": "Only JPEG/JPG and PNG formats are allowed. Received: image/gif"
 }
 ```
 
 #### File Size Limit
+
 **Maximum Size**: **2 MB**
 
 **Validation Error** (400):
+
 ```json
 {
   "error": "Image file too large",
@@ -84,6 +94,7 @@ The `prompt_type` field defines which AI prompt is used:
 ```
 
 ### Example Request (cURL)
+
 ```bash
 curl -X POST http://localhost:3000/scaleup2026/generate \
   -F "name=John Doe" \
@@ -97,26 +108,28 @@ curl -X POST http://localhost:3000/scaleup2026/generate \
 ```
 
 ### Example Request (JavaScript/FormData)
+
 ```javascript
 const formData = new FormData();
-formData.append('name', 'John Doe');
-formData.append('email', 'john@example.com');
-formData.append('phone_no', '+919876543210');
-formData.append('district', 'Mumbai');
-formData.append('category', 'Working Professionals');
-formData.append('organization', 'Tech Corp');
-formData.append('prompt_type', 'prompt2');
-formData.append('photo', fileInputElement.files[0]);
+formData.append("name", "John Doe");
+formData.append("email", "john@example.com");
+formData.append("phone_no", "+919876543210");
+formData.append("district", "Mumbai");
+formData.append("category", "Working Professionals");
+formData.append("organization", "Tech Corp");
+formData.append("prompt_type", "prompt2");
+formData.append("photo", fileInputElement.files[0]);
 
-const response = await fetch('/scaleup2026/generate', {
-  method: 'POST',
-  body: formData
+const response = await fetch("/scaleup2026/generate", {
+  method: "POST",
+  body: formData,
 });
 
 const data = await response.json();
 ```
 
 ### Success Response (200)
+
 ```json
 {
   "success": true,
@@ -129,6 +142,7 @@ const data = await response.json();
 ### Error Responses
 
 #### Missing Required Field (400)
+
 ```json
 {
   "error": "Name is required"
@@ -136,6 +150,7 @@ const data = await response.json();
 ```
 
 #### Invalid Email Format (400)
+
 ```json
 {
   "error": "Valid email is required"
@@ -143,6 +158,7 @@ const data = await response.json();
 ```
 
 #### Invalid Phone Format (400)
+
 ```json
 {
   "error": "Valid phone number is required (10-15 digits)"
@@ -150,6 +166,7 @@ const data = await response.json();
 ```
 
 #### Invalid Category (400)
+
 ```json
 {
   "error": "Valid category is required"
@@ -157,6 +174,7 @@ const data = await response.json();
 ```
 
 #### Invalid Prompt Type (400)
+
 ```json
 {
   "error": "Valid prompt_type is required (prompt1, prompt2, or prompt3)"
@@ -164,6 +182,7 @@ const data = await response.json();
 ```
 
 #### Missing Photo (400)
+
 ```json
 {
   "error": "Photo is required"
@@ -171,6 +190,7 @@ const data = await response.json();
 ```
 
 #### Server Error (500)
+
 ```json
 {
   "error": "Internal Server Error",
@@ -183,22 +203,26 @@ const data = await response.json();
 ## GET Endpoint: Retrieve Final Image URL
 
 ### Endpoint
+
 ```
 GET /scaleup2026/user/[userId]
 GET /api/user/[userId]
 ```
 
 ### URL Parameters
-| Parameter | Type | Required | Description |
-|-----------|------|----------|-------------|
-| `userId` | UUID | ✅ | The UUID of the generated avatar record |
+
+| Parameter | Type | Required | Description                             |
+| --------- | ---- | -------- | --------------------------------------- |
+| `userId`  | UUID | ✅       | The UUID of the generated avatar record |
 
 ### Example Request
+
 ```bash
 curl -X GET "http://localhost:3000/scaleup2026/user/550e8400-e29b-41d4-a716-446655440000"
 ```
 
 ### Success Response (200)
+
 ```json
 {
   "success": true,
@@ -207,6 +231,7 @@ curl -X GET "http://localhost:3000/scaleup2026/user/550e8400-e29b-41d4-a716-4466
 ```
 
 **Note**: The response returns **ONLY** the final image URL. The `final_image_url` is the completely processed avatar image after:
+
 1. AI generation from the original photo
 2. Background/layer merging
 3. Text overlay application
@@ -215,6 +240,7 @@ curl -X GET "http://localhost:3000/scaleup2026/user/550e8400-e29b-41d4-a716-4466
 ### Error Responses
 
 #### Invalid UUID Format (400)
+
 ```json
 {
   "error": "Invalid user ID format"
@@ -222,6 +248,7 @@ curl -X GET "http://localhost:3000/scaleup2026/user/550e8400-e29b-41d4-a716-4466
 ```
 
 #### User Not Found (404)
+
 ```json
 {
   "error": "User not found"
@@ -229,6 +256,7 @@ curl -X GET "http://localhost:3000/scaleup2026/user/550e8400-e29b-41d4-a716-4466
 ```
 
 #### Database Error (500)
+
 ```json
 {
   "error": "Database error",
@@ -242,22 +270,21 @@ curl -X GET "http://localhost:3000/scaleup2026/user/550e8400-e29b-41d4-a716-4466
 
 ### `generations` Table
 
-| Column | Type | Constraints | Notes |
-|--------|------|-------------|-------|
-| `id` | UUID | PRIMARY KEY | Auto-generated |
-| `name` | TEXT | NOT NULL | User's full name |
-| `edit_name` | TEXT | Nullable | Alternative name |
-| `email` | TEXT | NOT NULL | Valid email format |
-| `phone_no` | TEXT | NOT NULL | 10-15 digits with optional + |
-| `district` | TEXT | NOT NULL | User's district/region |
-| `category` | TEXT | NOT NULL | One of 6 predefined categories |
-| `organization` | TEXT | NOT NULL | Organization/company name |
-| `photo_url` | TEXT | NOT NULL | URL of original uploaded photo |
-| `generated_image_url` | TEXT | NOT NULL | **FINAL MERGED IMAGE URL** |
-| `aws_key` | TEXT | Nullable | S3 key for uploaded photo |
-| `prompt_type` | TEXT | NOT NULL | One of: prompt1, prompt2, prompt3 |
-| `created_at` | TIMESTAMP | DEFAULT NOW() | Creation timestamp |
-| `updated_at` | TIMESTAMP | DEFAULT NOW() | Last update timestamp |
+| Column                | Type      | Constraints   | Notes                             |
+| --------------------- | --------- | ------------- | --------------------------------- |
+| `id`                  | UUID      | PRIMARY KEY   | Auto-generated                    |
+| `name`                | TEXT      | NOT NULL      | User's full name                  |
+| `email`               | TEXT      | NOT NULL      | Valid email format                |
+| `phone_no`            | TEXT      | NOT NULL      | 10-15 digits with optional +      |
+| `district`            | TEXT      | NOT NULL      | User's district/region            |
+| `category`            | TEXT      | NOT NULL      | One of 6 predefined categories    |
+| `organization`        | TEXT      | NOT NULL      | Organization/company name         |
+| `photo_url`           | TEXT      | NOT NULL      | URL of original uploaded photo    |
+| `generated_image_url` | TEXT      | NOT NULL      | **FINAL MERGED IMAGE URL**        |
+| `aws_key`             | TEXT      | Nullable      | S3 key for uploaded photo         |
+| `prompt_type`         | TEXT      | NOT NULL      | One of: prompt1, prompt2, prompt3 |
+| `created_at`          | TIMESTAMP | DEFAULT NOW() | Creation timestamp                |
+| `updated_at`          | TIMESTAMP | DEFAULT NOW() | Last update timestamp             |
 
 ---
 
@@ -269,7 +296,7 @@ curl -X GET "http://localhost:3000/scaleup2026/user/550e8400-e29b-41d4-a716-4466
 1. User uploads photo
    ↓
 2. Validation
-   ├─ Format check (JPEG/PNG/WebP only)
+  ├─ Format check (JPEG/JPG/PNG only)
    └─ Size check (≤ 2MB)
    ↓
 3. AI Processing
@@ -290,7 +317,9 @@ curl -X GET "http://localhost:3000/scaleup2026/user/550e8400-e29b-41d4-a716-4466
 ```
 
 ### Final Image (`generated_image_url`)
+
 The `final_image_url` contains the completely processed avatar after all transformations:
+
 - ✅ AI-styled avatar (Superman/Professional/Warrior)
 - ✅ Merged with background/design layers
 - ✅ Text overlay applied (organization name at bottom)
@@ -322,20 +351,21 @@ SUPABASE_SERVICE_ROLE_KEY=your_service_role_key
 
 ### Common Errors & Solutions
 
-| Error | Cause | Solution |
-|-------|-------|----------|
-| `Invalid image format` | Wrong file type uploaded | Use JPEG, PNG, or WebP format |
-| `Image file too large` | File exceeds 2MB | Compress image before uploading |
-| `Valid email is required` | Email doesn't match regex | Ensure email format: user@domain.com |
-| `Valid phone number is required` | Phone has invalid digits | Use 10-15 digits with optional + prefix |
-| `User not found` | Wrong userId provided | Verify userId from POST response |
-| `Database error` | Supabase connection issue | Check SUPABASE_URL and API keys |
+| Error                            | Cause                     | Solution                                |
+| -------------------------------- | ------------------------- | --------------------------------------- |
+| `Invalid image format`           | Wrong file type uploaded  | Use JPEG/JPG or PNG format              |
+| `Image file too large`           | File exceeds 2MB          | Compress image before uploading         |
+| `Valid email is required`        | Email doesn't match regex | Ensure email format: user@domain.com    |
+| `Valid phone number is required` | Phone has invalid digits  | Use 10-15 digits with optional + prefix |
+| `User not found`                 | Wrong userId provided     | Verify userId from POST response        |
+| `Database error`                 | Supabase connection issue | Check SUPABASE_URL and API keys         |
 
 ---
 
 ## Testing the API
 
 ### Using Postman
+
 1. Create new POST request to `/scaleup2026/generate`
 2. Set Body to `form-data`
 3. Add all required parameters
@@ -343,17 +373,18 @@ SUPABASE_SERVICE_ROLE_KEY=your_service_role_key
 5. Click Send
 
 ### Using Thunder Client / VS Code
+
 ```javascript
 // Pre-request Script to prepare form data
 const form = new FormData();
-form.append('name', 'Test User');
-form.append('email', 'test@example.com');
-form.append('phone_no', '9876543210');
-form.append('district', 'Test District');
-form.append('category', 'Working Professionals');
-form.append('organization', 'Test Org');
-form.append('prompt_type', 'prompt2');
-form.append('photo', /* file blob */);
+form.append("name", "Test User");
+form.append("email", "test@example.com");
+form.append("phone_no", "9876543210");
+form.append("district", "Test District");
+form.append("category", "Working Professionals");
+form.append("organization", "Test Org");
+form.append("prompt_type", "prompt2");
+form.append("photo" /* file blob */);
 ```
 
 ---
@@ -362,19 +393,22 @@ form.append('photo', /* file blob */);
 
 1. **Final Image URL**: The `generated_image_url` (returned as `final_image_url`) is the COMPLETE avatar after all processing, merging, and styling applied.
 
-2. **File Validation**: Only JPEG, PNG, and WebP formats are accepted. No dimension validation is applied—the system handles images of any size.
+2. **File Validation**: Only JPEG/JPG and PNG formats are accepted. No dimension validation is applied—the system handles images of any size.
 
-3. **UUID Format**: Always validate UUID format in GET requests. Must be standard UUID v4 format.
+3. **Name Edits in Modal**: The API always stores the current `name` value from the form. Any edits in the modal or registration form replace the previous name up until the user exits the modal or submits the registration.
 
-4. **Supabase Storage**: Final images are publicly accessible via the returned URL. Ensure bucket permissions are set to PUBLIC.
+4. **UUID Format**: Always validate UUID format in GET requests. Must be standard UUID v4 format.
 
-5. **Error Details**: In production, error details are hidden for security. In development mode, full stack traces are provided.
+5. **Supabase Storage**: Final images are publicly accessible via the returned URL. Ensure bucket permissions are set to PUBLIC.
+
+6. **Error Details**: In production, error details are hidden for security. In development mode, full stack traces are provided.
 
 ---
 
 ## Support
 
 For issues or questions about the API:
+
 - Check the error response `details` field
 - Verify all required fields are present in requests
 - Ensure image file meets format and size constraints

@@ -28,15 +28,15 @@ BEGIN
   END IF;
 END $$;
 
--- 2. Add edit_name column
-DO $$ 
+-- 2. Drop edit_name column (no longer used)
+DO $$
 BEGIN
-  IF NOT EXISTS (SELECT 1 FROM information_schema.columns 
-                 WHERE table_schema='public' AND table_name='generations' AND column_name='edit_name') THEN
-    ALTER TABLE public.generations ADD COLUMN edit_name TEXT;
-    RAISE NOTICE 'Added edit_name column';
+  IF EXISTS (SELECT 1 FROM information_schema.columns 
+             WHERE table_schema='public' AND table_name='generations' AND column_name='edit_name') THEN
+    ALTER TABLE public.generations DROP COLUMN edit_name;
+    RAISE NOTICE 'Dropped edit_name column';
   ELSE
-    RAISE NOTICE 'edit_name column already exists';
+    RAISE NOTICE 'edit_name column not found';
   END IF;
 END $$;
 

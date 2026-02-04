@@ -13,7 +13,7 @@ export const maxDuration = 60; // Increase timeout for long AI generation
 // FILE UPLOAD CONSTRAINTS
 // ============================================
 const MAX_IMAGE_SIZE = 2 * 1024 * 1024; // 2MB maximum file size
-const ALLOWED_IMAGE_FORMATS = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp']; // Supported: JPEG, PNG, WebP
+const ALLOWED_IMAGE_FORMATS = ['image/jpeg', 'image/jpg', 'image/png']; // Supported: JPEG, PNG
 
 // ============================================
 // FIELD VALIDATION PATTERNS
@@ -34,7 +34,6 @@ export async function POST(request: NextRequest) {
     const formData = await request.formData();
     const image = formData.get('photo') as File;
     const name = formData.get('name') as string;
-    const edit_name = formData.get('edit_name') as string;
     const email = formData.get('email') as string;
     const phone_no = formData.get('phone_no') as string;
     const district = formData.get('district') as string;
@@ -102,12 +101,12 @@ export async function POST(request: NextRequest) {
     // ============================================
     // IMAGE FILE VALIDATION
     // ============================================
-    // Constraint 1: Validate file format (JPEG, PNG, JPEG only)
+    // Constraint 1: Validate file format (JPEG/JPG, PNG only)
     if (!ALLOWED_IMAGE_FORMATS.includes(image.type)) {
       return NextResponse.json(
-        { 
+        {
           error: 'Invalid image format',
-          details: `Only JPEG, PNG, and WebP formats are allowed. Received: ${image.type}`
+          details: `Only JPEG/JPG and PNG formats are allowed. Received: ${image.type}`
         },
         { status: 400 }
       );
@@ -116,7 +115,7 @@ export async function POST(request: NextRequest) {
     // Constraint 2: Validate file size (max 2MB)
     if (image.size > MAX_IMAGE_SIZE) {
       return NextResponse.json(
-        { 
+        {
           error: 'Image file too large',
           details: `Maximum file size is 2MB. Current size: ${(image.size / 1024 / 1024).toFixed(2)}MB`
         },
@@ -299,7 +298,6 @@ export async function POST(request: NextRequest) {
       .from('generations')
       .insert({
         name: name.trim(),
-        edit_name: edit_name?.trim() || null,
         email: email.trim(),
         phone_no: phone_no.trim(),
         district: district.trim(),
