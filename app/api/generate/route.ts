@@ -6,7 +6,7 @@ import { supabaseAdmin } from '@/lib/supabase/admin';
 import OpenAI from 'openai';
 import sharp from 'sharp';
 
-export const maxDuration = 60; // Increase timeout for long AI generation
+export const maxDuration = 300; // 5 minutes timeout for long AI generation
 
 // 3 AI prompts for image generation
 const PROMPTS = {
@@ -212,12 +212,20 @@ export async function POST(request: NextRequest) {
       throw new Error('OPENROUTER_API_KEY is invalid. Get a valid key from https://openrouter.ai/keys');
     }
 
-    // Call OpenRouter
+    // Call OpenRouter with timeout
     console.log('✓ OpenRouter API key found, sending request...');
     console.log('  Prompt preview:', prompt.substring(0, 80) + '...');
     console.time('OpenRouter_AI_Call');
+    
+    const controller = new AbortController();
+    const timeout = setTimeout(() => {
+      console.warn('⏱️ OpenRouter request timeout after 120 seconds');
+      controller.abort();
+    }, 120000); // 120 second timeout
+    
     const apiResponse = await fetch('https://openrouter.ai/api/v1/chat/completions', {
       method: 'POST',
+      signal: controller.signal,
       headers: {
         'Authorization': `Bearer ${apiKey}`,
         'Content-Type': 'application/json',
@@ -237,6 +245,8 @@ export async function POST(request: NextRequest) {
         modalities: ['image']
       }),
     });
+    
+    clearTimeout(timeout);
 
     if (!apiResponse.ok) {
       console.timeEnd('OpenRouter_AI_Call');
@@ -274,7 +284,17 @@ export async function POST(request: NextRequest) {
     if (generatedImageUrl.startsWith('data:')) {
       imageBuffer = Buffer.from(generatedImageUrl.split(',')[1], 'base64');
     } else {
-      const imageResponse = await fetch(generatedImageUrl);
+      console.log('📥 Fetching generated image from URL...');
+      const imageController = new AbortController();
+      const imageTimeout = setTimeout(() => {
+        console.warn('⏱️ Image download timeout after 30 seconds');
+        imageController.abort();
+      }, 30000); // 30 second timeout
+      
+      const imageResponse = await fetch(generatedImageUrl, {
+        signal: imageController.signal
+      });
+      clearTimeout(imageTimeout);
       imageBuffer = Buffer.from(await imageResponse.arrayBuffer());
     }
 
@@ -322,32 +342,41 @@ export async function POST(request: NextRequest) {
     const finalImagePath = await mergeImages(tempGeneratedFile, timestamp.toString(), name, organization);
 
     // Save metadata to Supabase database
+    console.log('📝 Preparing database insert...');
+    const insertPayload = {
+      name: name.trim(),
+      email: email.trim(),
+      phone_no: phone_no.trim(),
+      district: district.trim(),
+      category: category.trim(),
+      organization: organization.trim(),
+      photo_url: uploadedImageUrl,
+      generated_image_url: finalImagePath,
+      aws_key: awsKey,
+      prompt_type: prompt_type
+    };
+    console.log('Insert payload:', insertPayload);
+
     const { data: dbData, error: dbError } = await supabase
       .from('generations')
-      .insert({
-        name: name.trim(),
-        email: email.trim(),
-        phone_no: phone_no.trim(),
-        district: district.trim(),
-        category: category.trim(),
-        organization: organization.trim(),
-        photo_url: uploadedImageUrl,
-        generated_image_url: finalImagePath,
-        aws_key: awsKey,
-        prompt_type: prompt_type
-      })
+      .insert(insertPayload)
       .select()
       .single();
 
     if (dbError) {
-      console.error('Database insert error:', dbError);
+      console.error('❌ Database insert error:', dbError);
+      console.error('   Error code:', dbError.code);
+      console.error('   Error message:', dbError.message);
+      console.error('   Full error:', JSON.stringify(dbError, null, 2));
       return NextResponse.json(
-        { error: 'Failed to save to database', details: dbError.message },
+        { error: 'Failed to save to database', details: dbError.message, code: dbError.code },
         { status: 500 }
       );
     }
 
-    console.log('Saved to database:', dbData);
+    console.log('✅ Saved to database successfully!');
+    console.log('   User ID:', dbData?.id);
+    console.log('   Generated Image URL:', dbData?.generated_image_url);
 
     return NextResponse.json({
       success: true,
