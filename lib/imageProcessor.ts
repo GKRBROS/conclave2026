@@ -2,7 +2,7 @@ import sharp from 'sharp';
 import { join } from 'path';
 import { existsSync } from 'fs';
 import { mkdir, writeFile } from 'fs/promises';
-import { getSupabaseClient } from '@/lib/supabase';
+import { supabaseAdmin } from '@/lib/supabase/admin';
 import { createCanvas, registerFont } from 'canvas';
 
 let fontsRegistered = false;
@@ -257,8 +257,7 @@ export async function mergeImages(
 
     // Upload final image to Supabase in production so it can be previewed and downloaded
     if (isProduction) {
-      const supabase = getSupabaseClient();
-      const { error: uploadError } = await supabase.storage
+      const { error: uploadError } = await supabaseAdmin.storage
         .from('generated-images')
         .upload(`final/${outputFilename}`, finalBuffer, {
           contentType: 'image/png',
@@ -270,7 +269,7 @@ export async function mergeImages(
         throw new Error('Failed to upload final image');
       }
 
-      const { data: { publicUrl } } = supabase.storage
+      const { data: { publicUrl } } = supabaseAdmin.storage
         .from('generated-images')
         .getPublicUrl(`final/${outputFilename}`);
 

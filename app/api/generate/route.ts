@@ -306,7 +306,7 @@ export async function POST(request: NextRequest) {
         category: category.trim(),
         organization: organization.trim(),
         photo_url: uploadedImageUrl,
-        generated_image_url: finalGeneratedUrl,
+        generated_image_url: finalImagePath,
         aws_key: awsKey,
         prompt_type: prompt_type
       })
