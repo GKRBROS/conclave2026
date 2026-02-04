@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { writeFile, mkdir } from 'fs/promises';
 import { join } from 'path';
 import { mergeImages } from '@/lib/imageProcessor';
-import { getSupabaseClient } from '@/lib/supabase';
+import { supabaseAdmin } from '@/lib/supabase/admin';
 import OpenAI from 'openai';
 import sharp from 'sharp';
 
@@ -31,6 +31,9 @@ const PROMPTS = {
 export async function POST(request: NextRequest) {
   const isProduction = process.env.NODE_ENV === 'production';
   try {
+    // Use admin client for database operations
+    const supabase = supabaseAdmin;
+
     const formData = await request.formData();
     const image = formData.get('photo') as File;
     const name = formData.get('name') as string;
@@ -149,8 +152,6 @@ export async function POST(request: NextRequest) {
         console.warn('Could not save to public/uploads (read-only FS):', err);
       }
     }
-
-    const supabase = getSupabaseClient();
 
     // Generate AWS key (S3 compatible path)
     const awsKey = `uploads/${timestamp}/${filename}`;

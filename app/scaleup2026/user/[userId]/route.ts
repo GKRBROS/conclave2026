@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { getSupabaseClient } from '@/lib/supabase';
+import { supabaseAdmin } from '@/lib/supabase/admin';
 
 export async function GET(
   request: Request,
@@ -17,7 +17,7 @@ export async function GET(
       );
     }
 
-    const supabase = getSupabaseClient();
+    const supabase = supabaseAdmin;
 
     // Fetch only the final generated image URL
     const { data, error } = await supabase
