@@ -19,10 +19,10 @@ export async function GET(
 
         const supabase = getSupabaseClient();
 
-        // Fetch user details from database
+        // Fetch only the final generated image URL
         const { data, error } = await supabase
             .from('generations')
-            .select('id, name, district, category, organization, aws_key, photo_url, generated_image_url, email, phone_no, edit_name, prompt_type, created_at')
+            .select('generated_image_url')
             .eq('id', userId)
             .single();
 
@@ -40,21 +40,10 @@ export async function GET(
             );
         }
 
-        // Return user details
+        // Return only the final image URL
         return NextResponse.json({
             success: true,
-            user: {
-                name: data.name,
-                district: data.district,
-                category: data.category,
-                organization: data.organization,
-                email: data.email,
-                phone_no: data.phone_no,
-                aws_key: data.aws_key,
-                prompt_type: data.prompt_type,
-                final_image_url: data.generated_image_url,
-                created_at: data.created_at
-            }
+            final_image_url: data.generated_image_url
         });
     } catch (error: any) {
         console.error('Error fetching user details:', error);

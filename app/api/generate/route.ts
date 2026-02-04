@@ -16,8 +16,15 @@ const PROMPTS = {
 };
 
 // Validation constants
-const MAX_IMAGE_SIZE = 2 * 1024 * 1024; // 2MB
-const ALLOWED_IMAGE_FORMATS = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
+// ============================================
+// FILE UPLOAD CONSTRAINTS
+// ============================================
+const MAX_IMAGE_SIZE = 2 * 1024 * 1024; // 2MB maximum file size
+const ALLOWED_IMAGE_FORMATS = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp']; // Supported: JPEG, PNG, WebP
+
+// ============================================
+// FIELD VALIDATION PATTERNS
+// ============================================
 const EMAIL_REGEX = /^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$/;
 const PHONE_REGEX = /^\+?[0-9]{10,15}$/;
 
@@ -93,23 +100,32 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Image format validation
+    // ============================================
+    // IMAGE FILE VALIDATION
+    // ============================================
+    // Constraint 1: Validate file format (JPEG, PNG, JPEG only)
     if (!ALLOWED_IMAGE_FORMATS.includes(image.type)) {
       return NextResponse.json(
-        { error: `Invalid image format. Allowed: ${ALLOWED_IMAGE_FORMATS.join(', ')}` },
+        { 
+          error: 'Invalid image format',
+          details: `Only JPEG, PNG, and WebP formats are allowed. Received: ${image.type}`
+        },
         { status: 400 }
       );
     }
 
-    // Image size validation
+    // Constraint 2: Validate file size (max 2MB)
     if (image.size > MAX_IMAGE_SIZE) {
       return NextResponse.json(
-        { error: `Image size exceeds ${MAX_IMAGE_SIZE / 1024 / 1024}MB limit` },
+        { 
+          error: 'Image file too large',
+          details: `Maximum file size is 2MB. Current size: ${(image.size / 1024 / 1024).toFixed(2)}MB`
+        },
         { status: 400 }
       );
     }
 
-    // Save uploaded image temporarily for local processing
+    // Proceed with processing
     const bytes = await image.arrayBuffer();
     const buffer = Buffer.from(bytes);
 

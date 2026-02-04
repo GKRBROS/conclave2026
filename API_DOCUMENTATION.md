@@ -1,282 +1,381 @@
-# API Documentation
+# AI Image Generator API Documentation
 
-## Base URL
-
-```
-http://localhost:3000  (Development)
-https://your-domain.com (Production)
-```
-
-## Authentication
-
-Currently, no authentication is required. API is open for testing.
+## Overview
+This API handles user registration with avatar generation using AI. The system processes uploaded images through an AI model to create stylized avatars, which are then merged with backgrounds and returned to the user.
 
 ---
 
-## Endpoints
+## Base URLs
+- **ScaleUp 2026 Endpoint**: `/scaleup2026/generate` (POST) and `/scaleup2026/user/[userId]` (GET)
+- **API Endpoint**: `/api/generate` (POST) and `/api/user/[userId]` (GET)
 
-### 1. Generate AI Image
+> Both endpoints have identical functionality. Use whichever matches your routing preference.
 
-**Endpoint:** `POST /api/generate`
+---
 
-**Description:** Upload a photo and generate an Arcane-style superhero portrait with custom text overlay.
+## POST Endpoint: Generate Avatar
 
-**Content-Type:** `multipart/form-data`
+### Endpoint
+```
+POST /scaleup2026/generate
+POST /api/generate
+```
 
-**Request Parameters:**
+### Request Format
+**Content-Type**: `multipart/form-data`
 
-| Field         | Type   | Required | Description              | Validation                      |
-| ------------- | ------ | -------- | ------------------------ | ------------------------------- |
-| `photo`       | File   | Yes      | Image file to transform  | JPEG, PNG, WEBP; Max 2MB        |
-| `name`        | string | Yes      | User's full name         | Non-empty string                |
-| `edit_name`   | string | No       | Alternative display name | Optional                        |
-| `email`       | string | Yes      | User's email address     | Valid email format              |
-| `phone_no`    | string | Yes      | Phone number             | 10-15 digits, optional + prefix |
-| `designation` | string | Yes      | Job title or role        | Non-empty string                |
+### Request Parameters
 
-**Validations:**
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `name` | string | ✅ | User's full name (cannot be empty) |
+| `edit_name` | string | ❌ | Alternative/edited name for display |
+| `email` | string | ✅ | Valid email address (regex validated) |
+| `phone_no` | string | ✅ | Phone number (10-15 digits, with optional + prefix) |
+| `district` | string | ✅ | District/region name (cannot be empty) |
+| `category` | string | ✅ | User category (must be one of the 6 options below) |
+| `organization` | string | ✅ | Organization/company name (cannot be empty) |
+| `prompt_type` | string | ✅ | Avatar style type (must be one of: `prompt1`, `prompt2`, `prompt3`) |
+| `photo` | File | ✅ | User's photo for avatar generation |
 
-- **Image Format:** Only JPEG, PNG, WEBP allowed
-- **Image Size:** Maximum 2MB
-- **Email:** Must match pattern: `user@domain.com`
-- **Phone:** Must match pattern: `+1234567890` (10-15 digits)
+### Category Options
+The `category` field must be one of these values:
+- `Startups`
+- `Working Professionals`
+- `Students`
+- `Business Owners`
+- `NRI / Gulf Retunees`
+- `Government Officials`
 
-**Response (200 OK):**
+### Avatar Style Types
+The `prompt_type` field defines which AI prompt is used:
 
+| Value | Style | Description |
+|-------|-------|-------------|
+| `prompt1` | **Superman** | Cinematic superhero portrait with bold, heroic presence |
+| `prompt2` | **Professional** | Corporate professional portrait with refined aesthetics |
+| `prompt3` | **Warrior** | Medieval warrior portrait with historical authenticity |
+
+### File Upload Constraints
+
+#### Image Format Requirements
+**Allowed Formats**: 
+- `image/jpeg` (JPEG/JPG)
+- `image/png` (PNG)
+- `image/webp` (WebP)
+
+**Validation Error** (400):
+```json
+{
+  "error": "Invalid image format",
+  "details": "Only JPEG, PNG, and WebP formats are allowed. Received: image/gif"
+}
+```
+
+#### File Size Limit
+**Maximum Size**: **2 MB**
+
+**Validation Error** (400):
+```json
+{
+  "error": "Image file too large",
+  "details": "Maximum file size is 2MB. Current size: 3.45MB"
+}
+```
+
+### Example Request (cURL)
+```bash
+curl -X POST http://localhost:3000/scaleup2026/generate \
+  -F "name=John Doe" \
+  -F "email=john@example.com" \
+  -F "phone_no=+919876543210" \
+  -F "district=Mumbai" \
+  -F "category=Working Professionals" \
+  -F "organization=Tech Corp" \
+  -F "prompt_type=prompt2" \
+  -F "photo=@/path/to/photo.jpg"
+```
+
+### Example Request (JavaScript/FormData)
+```javascript
+const formData = new FormData();
+formData.append('name', 'John Doe');
+formData.append('email', 'john@example.com');
+formData.append('phone_no', '+919876543210');
+formData.append('district', 'Mumbai');
+formData.append('category', 'Working Professionals');
+formData.append('organization', 'Tech Corp');
+formData.append('prompt_type', 'prompt2');
+formData.append('photo', fileInputElement.files[0]);
+
+const response = await fetch('/scaleup2026/generate', {
+  method: 'POST',
+  body: formData
+});
+
+const data = await response.json();
+```
+
+### Success Response (200)
 ```json
 {
   "success": true,
   "user_id": "550e8400-e29b-41d4-a716-446655440000",
-  "name": "John Doe",
-  "designation": "Software Developer",
-  "aws_key": "uploads/1738512000000/upload-1738512000000.jpg",
-  "photo_url": "https://your-supabase-url.supabase.co/storage/v1/object/public/generated-images/uploads/1738512000000/upload-1738512000000.jpg",
-  "generated_image_url": "https://your-supabase-url.supabase.co/storage/v1/object/public/generated-images/generated/generated-1738512000000.png",
-  "final_image_url": "/final/final-1738512000000.png"
+  "message": "Avatar generated successfully",
+  "final_image_url": "https://supabase-bucket.supabase.co/storage/v1/object/public/generated-images/uploads/1707000123456/merged-final.png"
 }
 ```
 
-**Error Responses:**
+### Error Responses
 
-| Status | Error                               | Description             |
-| ------ | ----------------------------------- | ----------------------- |
-| 400    | `Photo is required`                 | No image file uploaded  |
-| 400    | `Name is required`                  | Name field is empty     |
-| 400    | `Valid email is required`           | Email format invalid    |
-| 400    | `Valid phone number is required`    | Phone format invalid    |
-| 400    | `Designation is required`           | Designation field empty |
-| 400    | `Invalid image format`              | File type not supported |
-| 400    | `Image size exceeds 2MB limit`   | File too large          |
-| 500    | `Failed to upload image to storage` | Storage error           |
-| 500    | `Failed to save to database`        | Database error          |
-
-**Example cURL:**
-
-```bash
-curl -X POST http://localhost:3000/api/generate \
-  -F "photo=@/path/to/image.jpg" \
-  -F "name=John Doe" \
-  -F "edit_name=J. Doe" \
-  -F "email=john@example.com" \
-  -F "phone_no=+1234567890" \
-  -F "designation=Software Developer"
+#### Missing Required Field (400)
+```json
+{
+  "error": "Name is required"
+}
 ```
 
-**Example JavaScript (Fetch API):**
-
-```javascript
-const formData = new FormData();
-formData.append("photo", fileInput.files[0]);
-formData.append("name", "John Doe");
-formData.append("edit_name", "J. Doe");
-formData.append("email", "john@example.com");
-formData.append("phone_no", "+1234567890");
-formData.append("designation", "Software Developer");
-
-const response = await fetch("http://localhost:3000/api/generate", {
-  method: "POST",
-  body: formData,
-});
-
-const data = await response.json();
-console.log(data);
+#### Invalid Email Format (400)
+```json
+{
+  "error": "Valid email is required"
+}
 ```
 
-**Processing Time:** 30-60 seconds (AI generation + image processing)
+#### Invalid Phone Format (400)
+```json
+{
+  "error": "Valid phone number is required (10-15 digits)"
+}
+```
+
+#### Invalid Category (400)
+```json
+{
+  "error": "Valid category is required"
+}
+```
+
+#### Invalid Prompt Type (400)
+```json
+{
+  "error": "Valid prompt_type is required (prompt1, prompt2, or prompt3)"
+}
+```
+
+#### Missing Photo (400)
+```json
+{
+  "error": "Photo is required"
+}
+```
+
+#### Server Error (500)
+```json
+{
+  "error": "Internal Server Error",
+  "details": "Error message details (only in development mode)"
+}
+```
 
 ---
 
-### 2. Get User Details
+## GET Endpoint: Retrieve Final Image URL
 
-**Endpoint:** `GET /api/user/:userId`
+### Endpoint
+```
+GET /scaleup2026/user/[userId]
+GET /api/user/[userId]
+```
 
-**Description:** Retrieve user information and generated images by user ID.
+### URL Parameters
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `userId` | UUID | ✅ | The UUID of the generated avatar record |
 
-**Request Parameters:**
+### Example Request
+```bash
+curl -X GET "http://localhost:3000/scaleup2026/user/550e8400-e29b-41d4-a716-446655440000"
+```
 
-| Parameter | Type | Location | Required | Description              |
-| --------- | ---- | -------- | -------- | ------------------------ |
-| `userId`  | UUID | Path     | Yes      | User's unique identifier |
-
-**Response (200 OK):**
-
+### Success Response (200)
 ```json
 {
   "success": true,
-  "user": {
-    "id": "550e8400-e29b-41d4-a716-446655440000",
-    "name": "John Doe",
-    "edit_name": "J. Doe",
-    "email": "john@example.com",
-    "phone_no": "+1234567890",
-    "designation": "Software Developer",
-    "aws_key": "uploads/1738512000000/upload-1738512000000.jpg",
-    "photo_url": "https://your-supabase-url.supabase.co/storage/v1/object/public/generated-images/uploads/1738512000000/upload-1738512000000.jpg",
-    "generated_image_url": "https://your-supabase-url.supabase.co/storage/v1/object/public/generated-images/generated/generated-1738512000000.png",
-    "created_at": "2026-02-02T12:34:56.789Z"
-  }
+  "final_image_url": "https://supabase-bucket.supabase.co/storage/v1/object/public/generated-images/uploads/1707000123456/merged-final.png"
 }
 ```
 
-**Error Responses:**
+**Note**: The response returns **ONLY** the final image URL. The `final_image_url` is the completely processed avatar image after:
+1. AI generation from the original photo
+2. Background/layer merging
+3. Text overlay application
+4. PNG export with transparency
 
-| Status | Error                    | Description                 |
-| ------ | ------------------------ | --------------------------- |
-| 400    | `Invalid user ID format` | UUID format is invalid      |
-| 404    | `User not found`         | No user exists with that ID |
-| 500    | `Database error`         | Database query failed       |
+### Error Responses
 
-**Example cURL:**
-
-```bash
-curl -X GET http://localhost:3000/api/user/550e8400-e29b-41d4-a716-446655440000
+#### Invalid UUID Format (400)
+```json
+{
+  "error": "Invalid user ID format"
+}
 ```
 
-**Example JavaScript (Fetch API):**
+#### User Not Found (404)
+```json
+{
+  "error": "User not found"
+}
+```
 
-```javascript
-const userId = "550e8400-e29b-41d4-a716-446655440000";
-const response = await fetch(`http://localhost:3000/api/user/${userId}`);
-const data = await response.json();
-console.log(data.user);
+#### Database Error (500)
+```json
+{
+  "error": "Database error",
+  "details": "Error message from Supabase"
+}
 ```
 
 ---
 
 ## Database Schema
 
-### Table: `generations`
+### `generations` Table
 
-```sql
-CREATE TABLE public.generations (
-  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-  name TEXT NOT NULL,
-  edit_name TEXT,
-  email TEXT NOT NULL,
-  phone_no TEXT NOT NULL,
-  designation TEXT NOT NULL,
-  photo_url TEXT NOT NULL,
-  generated_image_url TEXT NOT NULL,
-  aws_key TEXT,
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-
-  CONSTRAINT email_format CHECK (email ~* '^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$'),
-  CONSTRAINT phone_format CHECK (phone_no ~* '^\+?[0-9]{10,15}$')
-);
-```
+| Column | Type | Constraints | Notes |
+|--------|------|-------------|-------|
+| `id` | UUID | PRIMARY KEY | Auto-generated |
+| `name` | TEXT | NOT NULL | User's full name |
+| `edit_name` | TEXT | Nullable | Alternative name |
+| `email` | TEXT | NOT NULL | Valid email format |
+| `phone_no` | TEXT | NOT NULL | 10-15 digits with optional + |
+| `district` | TEXT | NOT NULL | User's district/region |
+| `category` | TEXT | NOT NULL | One of 6 predefined categories |
+| `organization` | TEXT | NOT NULL | Organization/company name |
+| `photo_url` | TEXT | NOT NULL | URL of original uploaded photo |
+| `generated_image_url` | TEXT | NOT NULL | **FINAL MERGED IMAGE URL** |
+| `aws_key` | TEXT | Nullable | S3 key for uploaded photo |
+| `prompt_type` | TEXT | NOT NULL | One of: prompt1, prompt2, prompt3 |
+| `created_at` | TIMESTAMP | DEFAULT NOW() | Creation timestamp |
+| `updated_at` | TIMESTAMP | DEFAULT NOW() | Last update timestamp |
 
 ---
 
-## Setup Instructions
+## Image Processing Pipeline
 
-### 1. Environment Variables
+### Step-by-Step Flow
 
-Create a `.env.local` file:
+```
+1. User uploads photo
+   ↓
+2. Validation
+   ├─ Format check (JPEG/PNG/WebP only)
+   └─ Size check (≤ 2MB)
+   ↓
+3. AI Processing
+   ├─ Resize image to 1024x1024
+   ├─ Convert to base64
+   └─ Send to OpenRouter API with selected prompt
+   ↓
+4. Image Merging
+   ├─ Receive AI-generated avatar
+   ├─ Merge with background/layers
+   ├─ Add text overlay (organization name)
+   └─ Export as PNG with transparency
+   ↓
+5. Storage & Database
+   ├─ Upload final image to Supabase Storage
+   ├─ Save metadata to generations table
+   └─ Return final_image_url to client
+```
+
+### Final Image (`generated_image_url`)
+The `final_image_url` contains the completely processed avatar after all transformations:
+- ✅ AI-styled avatar (Superman/Professional/Warrior)
+- ✅ Merged with background/design layers
+- ✅ Text overlay applied (organization name at bottom)
+- ✅ PNG format with transparent background
+- ✅ 4K quality output
+
+---
+
+## Environment Variables Required
 
 ```env
-# Supabase
-SUPABASE_URL=https://your-project.supabase.co
-SUPABASE_ANON_KEY=your-anon-key
-
-# OpenRouter (AI Image Generation)
-OPENROUTER_API_KEY=your-openrouter-key
-
-# Node Environment
-NODE_ENV=development
-```
-
-### 2. Supabase Setup
-
-Run the SQL commands in `supabase-setup.sql`:
-
-```bash
-# In Supabase Dashboard > SQL Editor, run:
-```
-
-1. Create storage bucket: `generated-images`
-2. Set bucket to public
-3. Create `generations` table
-4. Enable Row Level Security (RLS)
-5. Create access policies
-
-### 3. Install Dependencies
-
-```bash
-npm install
-```
-
-### 4. Run Development Server
-
-```bash
-npm run dev
-```
-
-Visit `http://localhost:3000` to see API documentation.
-
----
-
-## Testing
-
-### Test Image Upload
-
-```bash
-# Linux/Mac
-curl -X POST http://localhost:3000/api/generate \
-  -F "photo=@test-image.jpg" \
-  -F "name=Test User" \
-  -F "email=test@example.com" \
-  -F "phone_no=1234567890" \
-  -F "designation=Tester"
-
-# Windows PowerShell
-$form = @{
-    photo = Get-Item -Path "test-image.jpg"
-    name = "Test User"
-    email = "test@example.com"
-    phone_no = "1234567890"
-    designation = "Tester"
-}
-Invoke-RestMethod -Uri "http://localhost:3000/api/generate" -Method Post -Form $form
-```
-
-### Test User Retrieval
-
-```bash
-curl -X GET http://localhost:3000/api/user/YOUR_USER_ID_HERE
+OPENROUTER_API_KEY=your_openrouter_api_key
+NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=your_anon_key
+SUPABASE_SERVICE_ROLE_KEY=your_service_role_key
 ```
 
 ---
 
-## Rate Limiting & Costs
+## Rate Limiting & Timeouts
 
-- **Processing Time:** 30-60 seconds per image
-- **OpenRouter Cost:** ~$0.01-0.05 per generation
-- **Concurrent Requests:** Limited by Vercel/hosting provider
-- **Supabase Storage:** 1GB free, then paid
+- **Request Timeout**: 60 seconds (enough for AI generation)
+- **Max Upload Size**: 2 MB per image
+- **Concurrent Requests**: No explicit limit (Vercel/Server dependent)
+
+---
+
+## Error Handling Guide
+
+### Common Errors & Solutions
+
+| Error | Cause | Solution |
+|-------|-------|----------|
+| `Invalid image format` | Wrong file type uploaded | Use JPEG, PNG, or WebP format |
+| `Image file too large` | File exceeds 2MB | Compress image before uploading |
+| `Valid email is required` | Email doesn't match regex | Ensure email format: user@domain.com |
+| `Valid phone number is required` | Phone has invalid digits | Use 10-15 digits with optional + prefix |
+| `User not found` | Wrong userId provided | Verify userId from POST response |
+| `Database error` | Supabase connection issue | Check SUPABASE_URL and API keys |
+
+---
+
+## Testing the API
+
+### Using Postman
+1. Create new POST request to `/scaleup2026/generate`
+2. Set Body to `form-data`
+3. Add all required parameters
+4. Attach image file to `photo` field
+5. Click Send
+
+### Using Thunder Client / VS Code
+```javascript
+// Pre-request Script to prepare form data
+const form = new FormData();
+form.append('name', 'Test User');
+form.append('email', 'test@example.com');
+form.append('phone_no', '9876543210');
+form.append('district', 'Test District');
+form.append('category', 'Working Professionals');
+form.append('organization', 'Test Org');
+form.append('prompt_type', 'prompt2');
+form.append('photo', /* file blob */);
+```
+
+---
+
+## Important Notes
+
+1. **Final Image URL**: The `generated_image_url` (returned as `final_image_url`) is the COMPLETE avatar after all processing, merging, and styling applied.
+
+2. **File Validation**: Only JPEG, PNG, and WebP formats are accepted. No dimension validation is applied—the system handles images of any size.
+
+3. **UUID Format**: Always validate UUID format in GET requests. Must be standard UUID v4 format.
+
+4. **Supabase Storage**: Final images are publicly accessible via the returned URL. Ensure bucket permissions are set to PUBLIC.
+
+5. **Error Details**: In production, error details are hidden for security. In development mode, full stack traces are provided.
 
 ---
 
 ## Support
 
-For issues or questions, contact your development team.
+For issues or questions about the API:
+- Check the error response `details` field
+- Verify all required fields are present in requests
+- Ensure image file meets format and size constraints
+- Validate category and prompt_type values against allowed options
