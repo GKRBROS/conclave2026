@@ -31,6 +31,8 @@ const PROMPTS = {
 export async function POST(request: NextRequest) {
   const isProduction = process.env.NODE_ENV === 'production';
   try {
+    console.log('📝 [1/7] Starting avatar generation...');
+    
     // Use admin client for database operations
     const supabase = supabaseAdmin;
 
@@ -101,6 +103,8 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    console.log('✓ [2/7] All validations passed');
+
     // ============================================
     // IMAGE FILE VALIDATION
     // ============================================
@@ -157,7 +161,7 @@ export async function POST(request: NextRequest) {
     const awsKey = `uploads/${timestamp}/${filename}`;
 
     // Upload to Supabase Storage
-    console.log('Uploading input to Supabase Storage...');
+    console.log('✓ [3/7] Uploading input image to Supabase Storage...');
     const { data: uploadData, error: uploadError } = await supabase.storage
       .from('generated-images')
       .upload(awsKey, buffer, {
@@ -166,11 +170,8 @@ export async function POST(request: NextRequest) {
       });
 
     if (uploadError) {
-      console.error('Supabase upload error:', uploadError);
-      return NextResponse.json(
-        { error: 'Failed to upload image to storage' },
-        { status: 500 }
-      );
+      console.error('❌ Supabase upload error:', uploadError);
+      throw new Error(`Supabase upload failed: ${uploadError.message}`);
     }
 
     const { data: { publicUrl } } = supabase.storage
@@ -190,6 +191,8 @@ export async function POST(request: NextRequest) {
 
     const base64Image = resizedBuffer.toString('base64');
     const dataUrl = `data:image/jpeg;base64,${base64Image}`;
+
+    console.log('✓ [4/7] Image resized and converted to base64');
 
     // Call OpenRouter
     const prompt = PROMPTS[prompt_type as keyof typeof PROMPTS];
@@ -246,7 +249,18 @@ export async function POST(request: NextRequest) {
       throw new Error(`OpenRouter Error ${apiResponse.status}: ${errorDetail}`);
     }
 
-    const result = await apiResponse.json();
+    const responseText = await apiResponse.text();
+    if (!responseText) {
+      throw new Error('OpenRouter returned an empty response body');
+    }
+
+    let result: any;
+    try {
+      result = JSON.parse(responseText);
+    } catch (parseError) {
+      console.error('Failed to parse OpenRouter JSON response:', responseText.slice(0, 500));
+      throw new Error('OpenRouter returned invalid JSON');
+    }
     console.timeEnd('OpenRouter_AI_Call');
     const responseMessage = result.choices[0].message;
     let generatedImageUrl: string | undefined = responseMessage.images?.[0]?.image_url?.url;
@@ -263,6 +277,8 @@ export async function POST(request: NextRequest) {
       const imageResponse = await fetch(generatedImageUrl);
       imageBuffer = Buffer.from(await imageResponse.arrayBuffer());
     }
+
+    console.log('✓ [5/7] AI generated image processed');
 
     // Save intermediate image
     const generatedFilename = `generated-${timestamp}.png`;
@@ -303,9 +319,13 @@ export async function POST(request: NextRequest) {
       finalGeneratedUrl = publicUrl;
     }
 
+    console.log('✓ [6/7] Merging image with background...');
+    
     // Merge with background
     // Pass the /tmp path for processing
     const finalImagePath = await mergeImages(tempGeneratedFile, timestamp.toString(), name, organization);
+
+    console.log('✓ [7/7] Saving to database...');
 
     // Save metadata to Supabase database
     const { data: dbData, error: dbError } = await supabase
@@ -344,14 +364,29 @@ export async function POST(request: NextRequest) {
       final_image_url: finalImagePath
     });
   } catch (error: any) {
-    console.error('CRITICAL ERROR during generation:', error);
-    // Log stack trace for Vercel logs
-    if (error.stack) console.error(error.stack);
+    console.error('❌ CRITICAL ERROR during generation:', error);
+    console.error('Error type:', error.constructor.name);
+    console.error('Error message:', error?.message);
+    
+    // Log stack trace for debugging
+    if (error.stack) {
+      console.error('Stack trace:', error.stack);
+    }
+
+    // More detailed error information
+    if (error.response) {
+      console.error('API Response status:', error.response.status);
+      console.error('API Response data:', error.response.data);
+    }
 
     return NextResponse.json(
       {
-        error: error?.message || 'Internal Server Error',
-        details: isProduction ? undefined : error?.stack
+        error: 'Failed to generate avatar',
+        message: error?.message || 'Internal Server Error',
+        details: isProduction ? undefined : {
+          stack: error?.stack,
+          type: error.constructor.name
+        }
       },
       { status: 500 }
     );

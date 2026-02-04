@@ -31,6 +31,8 @@ const PHONE_REGEX = /^\+?[0-9]{10,15}$/;
 export async function POST(request: NextRequest) {
   const isProduction = process.env.NODE_ENV === 'production';
   try {
+    console.log('📝 [1/7] Starting avatar generation...');
+    
     // Use admin client for database operations
     const supabase = supabaseAdmin;
 
@@ -247,7 +249,18 @@ export async function POST(request: NextRequest) {
       throw new Error(`OpenRouter Error ${apiResponse.status}: ${errorDetail}`);
     }
 
-    const result = await apiResponse.json();
+    const responseText = await apiResponse.text();
+    if (!responseText) {
+      throw new Error('OpenRouter returned an empty response body');
+    }
+
+    let result: any;
+    try {
+      result = JSON.parse(responseText);
+    } catch (parseError) {
+      console.error('Failed to parse OpenRouter JSON response:', responseText.slice(0, 500));
+      throw new Error('OpenRouter returned invalid JSON');
+    }
     console.timeEnd('OpenRouter_AI_Call');
     const responseMessage = result.choices[0].message;
     let generatedImageUrl: string | undefined = responseMessage.images?.[0]?.image_url?.url;
@@ -347,14 +360,29 @@ export async function POST(request: NextRequest) {
       final_image_url: finalImagePath
     });
   } catch (error: any) {
-    console.error('CRITICAL ERROR during generation:', error);
-    // Log stack trace for Vercel logs
-    if (error.stack) console.error(error.stack);
+    console.error('❌ CRITICAL ERROR during generation:', error);
+    console.error('Error type:', error.constructor.name);
+    console.error('Error message:', error?.message);
+    
+    // Log stack trace for debugging
+    if (error.stack) {
+      console.error('Stack trace:', error.stack);
+    }
+
+    // More detailed error information
+    if (error.response) {
+      console.error('API Response status:', error.response.status);
+      console.error('API Response data:', error.response.data);
+    }
 
     return NextResponse.json(
       {
-        error: error?.message || 'Internal Server Error',
-        details: isProduction ? undefined : error?.stack
+        error: 'Failed to generate avatar',
+        message: error?.message || 'Internal Server Error',
+        details: isProduction ? undefined : {
+          stack: error?.stack,
+          type: error.constructor.name
+        }
       },
       { status: 500 }
     );
