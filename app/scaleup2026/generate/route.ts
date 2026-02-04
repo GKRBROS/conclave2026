@@ -6,7 +6,7 @@ import { supabaseAdmin } from '@/lib/supabase/admin';
 import OpenAI from 'openai';
 import sharp from 'sharp';
 
-export const maxDuration = 300; // 5 minutes timeout for long AI generation
+export const maxDuration = 1000; // 10 minutes timeout for long AI generation (superhero/prompt3 needs more time)
 
 // Validation constants
 // ============================================
@@ -32,7 +32,7 @@ export async function POST(request: NextRequest) {
   const isProduction = process.env.NODE_ENV === 'production';
   try {
     console.log('📝 [1/7] Starting avatar generation...');
-    
+
     // Use admin client for database operations
     const supabase = supabaseAdmin;
 
@@ -216,13 +216,13 @@ export async function POST(request: NextRequest) {
     console.log('✓ OpenRouter API key found, sending request...');
     console.log('  Prompt preview:', prompt.substring(0, 80) + '...');
     console.time('OpenRouter_AI_Call');
-    
+
     const controller = new AbortController();
     const timeout = setTimeout(() => {
-      console.warn('⏱️ OpenRouter request timeout after 120 seconds');
+      console.warn('⏱️ OpenRouter request timeout after 300 seconds');
       controller.abort();
-    }, 120000); // 120 second timeout
-    
+    }, 300000); // 300 second timeout (5 minutes) for superhero generation
+
     const apiResponse = await fetch('https://openrouter.ai/api/v1/chat/completions', {
       method: 'POST',
       signal: controller.signal,
@@ -245,7 +245,7 @@ export async function POST(request: NextRequest) {
         modalities: ['image']
       }),
     });
-    
+
     clearTimeout(timeout);
 
     if (!apiResponse.ok) {
@@ -282,146 +282,146 @@ export async function POST(request: NextRequest) {
     // Process AI Image
     let imageBuffer: Buffer;
     if (generatedImageUrl.startsWith('data:')) {
-    // Process AI Image
-    let imageBuffer: Buffer;
-    if (generatedImageUrl.startsWith('data:')) {
-      imageBuffer = Buffer.from(generatedImageUrl.split(',')[1], 'base64');
-    } else {
-      console.log('📥 Fetching generated image from URL...');
-      const imageController = new AbortController();
-      const imageTimeout = setTimeout(() => {
-        console.warn('⏱️ Image download timeout after 30 seconds');
-        imageController.abort();
-      }, 30000); // 30 second timeout
-      
-      const imageResponse = await fetch(generatedImageUrl, {
-        signal: imageController.signal
-      });
-      clearTimeout(imageTimeout);
-      imageBuffer = Buffer.from(await imageResponse.arrayBuffer());
-    }
+      // Process AI Image
+      let imageBuffer: Buffer;
+      if (generatedImageUrl.startsWith('data:')) {
+        imageBuffer = Buffer.from(generatedImageUrl.split(',')[1], 'base64');
+      } else {
+        console.log('📥 Fetching generated image from URL...');
+        const imageController = new AbortController();
+        const imageTimeout = setTimeout(() => {
+          console.warn('⏱️ Image download timeout after 60 seconds');
+          imageController.abort();
+        }, 60000); // 60 second timeout
 
-    console.log('✓ [5/7] AI generated image processed');
-
-    // Save intermediate image
-    const generatedFilename = `generated-${timestamp}.png`;
-    let finalGeneratedUrl = `/generated/${generatedFilename}`;
-
-    // Save to /tmp
-    const tmpGeneratedPath = join('/tmp', 'generated');
-    await mkdir(tmpGeneratedPath, { recursive: true }).catch(() => { });
-    const tempGeneratedFile = join(tmpGeneratedPath, generatedFilename);
-    await writeFile(tempGeneratedFile, imageBuffer);
-
-    // Optional local save
-    if (!isProduction) {
-      try {
-        const publicGeneratedPath = join(process.cwd(), 'public', 'generated');
-        await mkdir(publicGeneratedPath, { recursive: true }).catch(() => { });
-        await writeFile(join(publicGeneratedPath, generatedFilename), imageBuffer);
-      } catch (err) {
-        console.warn('Could not save to public/generated (read-only FS):', err);
+        const imageResponse = await fetch(generatedImageUrl, {
+          signal: imageController.signal
+        });
+        clearTimeout(imageTimeout);
+        imageBuffer = Buffer.from(await imageResponse.arrayBuffer());
       }
-    }
 
-    // Upload to Supabase Storage
-    console.log('Uploading generated image to Supabase Storage...');
-    const { data: genData, error: genError } = await supabase.storage
-      .from('generated-images')
-      .upload(`generated/${generatedFilename}`, imageBuffer, {
-        contentType: 'image/png',
-        upsert: false
-      });
+      console.log('✓ [5/7] AI generated image processed');
 
-    if (genError) {
-      console.error('Supabase generated upload error:', genError);
-    } else {
-      const { data: { publicUrl } } = supabase.storage
+      // Save intermediate image
+      const generatedFilename = `generated-${timestamp}.png`;
+      let finalGeneratedUrl = `/generated/${generatedFilename}`;
+
+      // Save to /tmp
+      const tmpGeneratedPath = join('/tmp', 'generated');
+      await mkdir(tmpGeneratedPath, { recursive: true }).catch(() => { });
+      const tempGeneratedFile = join(tmpGeneratedPath, generatedFilename);
+      await writeFile(tempGeneratedFile, imageBuffer);
+
+      // Optional local save
+      if (!isProduction) {
+        try {
+          const publicGeneratedPath = join(process.cwd(), 'public', 'generated');
+          await mkdir(publicGeneratedPath, { recursive: true }).catch(() => { });
+          await writeFile(join(publicGeneratedPath, generatedFilename), imageBuffer);
+        } catch (err) {
+          console.warn('Could not save to public/generated (read-only FS):', err);
+        }
+      }
+
+      // Upload to Supabase Storage
+      console.log('Uploading generated image to Supabase Storage...');
+      const { data: genData, error: genError } = await supabase.storage
         .from('generated-images')
-        .getPublicUrl(`generated/${generatedFilename}`);
-      finalGeneratedUrl = publicUrl;
-    }
+        .upload(`generated/${generatedFilename}`, imageBuffer, {
+          contentType: 'image/png',
+          upsert: false
+        });
 
-    console.log('✓ [6/7] Merging image with background...');
-    
-    // Merge with background
-    // Pass the /tmp path for processing
-    const finalImagePath = await mergeImages(tempGeneratedFile, timestamp.toString(), name, organization);
+      if (genError) {
+        console.error('Supabase generated upload error:', genError);
+      } else {
+        const { data: { publicUrl } } = supabase.storage
+          .from('generated-images')
+          .getPublicUrl(`generated/${generatedFilename}`);
+        finalGeneratedUrl = publicUrl;
+      }
 
-    console.log('✓ [7/7] Saving to database...');
+      console.log('✓ [6/7] Merging image with background...');
 
-    // Save metadata to Supabase database
-    console.log('📝 Preparing database insert...');
-    const insertPayload = {
-      name: name.trim(),
-      email: email.trim(),
-      phone_no: phone_no.trim(),
-      district: district.trim(),
-      category: category.trim(),
-      organization: organization.trim(),
-      photo_url: uploadedImageUrl,
-      generated_image_url: finalImagePath,
-      aws_key: awsKey,
-      prompt_type: prompt_type
-    };
-    console.log('Insert payload:', insertPayload);
+      // Merge with background
+      // Pass the /tmp path for processing
+      const finalImagePath = await mergeImages(tempGeneratedFile, timestamp.toString(), name, organization);
 
-    const { data: dbData, error: dbError } = await supabase
-      .from('generations')
-      .insert(insertPayload)
-      .select()
-      .single();
+      console.log('✓ [7/7] Saving to database...');
 
-    if (dbError) {
-      console.error('❌ Database insert error:', dbError);
-      console.error('   Error code:', dbError.code);
-      console.error('   Error message:', dbError.message);
-      console.error('   Full error:', JSON.stringify(dbError, null, 2));
+      // Save metadata to Supabase database
+      console.log('📝 Preparing database insert...');
+      const insertPayload = {
+        name: name.trim(),
+        email: email.trim(),
+        phone_no: phone_no.trim(),
+        district: district.trim(),
+        category: category.trim(),
+        organization: organization.trim(),
+        photo_url: uploadedImageUrl,
+        generated_image_url: finalImagePath,
+        aws_key: awsKey,
+        prompt_type: prompt_type
+      };
+      console.log('Insert payload:', insertPayload);
+
+      const { data: dbData, error: dbError } = await supabase
+        .from('generations')
+        .insert(insertPayload)
+        .select()
+        .single();
+
+      if (dbError) {
+        console.error('❌ Database insert error:', dbError);
+        console.error('   Error code:', dbError.code);
+        console.error('   Error message:', dbError.message);
+        console.error('   Full error:', JSON.stringify(dbError, null, 2));
+        return NextResponse.json(
+          { error: 'Failed to save to database', details: dbError.message, code: dbError.code },
+          { status: 500 }
+        );
+      }
+
+      console.log('✅ Saved to database successfully!');
+      console.log('   User ID:', dbData?.id);
+      console.log('   Generated Image URL:', dbData?.generated_image_url);
+
+      return NextResponse.json({
+        success: true,
+        user_id: dbData.id,
+        name: dbData.name,
+        organization: dbData.organization,
+        aws_key: dbData.aws_key,
+        final_image_url: finalImagePath
+      });
+    } catch (error: any) {
+      console.error('❌ CRITICAL ERROR during generation:', error);
+      console.error('Error type:', error.constructor.name);
+      console.error('Error message:', error?.message);
+
+      // Log stack trace for debugging
+      if (error.stack) {
+        console.error('Stack trace:', error.stack);
+      }
+
+      // More detailed error information
+      if (error.response) {
+        console.error('API Response status:', error.response.status);
+        console.error('API Response data:', error.response.data);
+      }
+
       return NextResponse.json(
-        { error: 'Failed to save to database', details: dbError.message, code: dbError.code },
+        {
+          error: 'Failed to generate avatar',
+          message: error?.message || 'Internal Server Error',
+          details: isProduction ? undefined : {
+            stack: error?.stack,
+            type: error.constructor.name
+          }
+        },
         { status: 500 }
       );
     }
-
-    console.log('✅ Saved to database successfully!');
-    console.log('   User ID:', dbData?.id);
-    console.log('   Generated Image URL:', dbData?.generated_image_url);
-
-    return NextResponse.json({
-      success: true,
-      user_id: dbData.id,
-      name: dbData.name,
-      organization: dbData.organization,
-      aws_key: dbData.aws_key,
-      final_image_url: finalImagePath
-    });
-  } catch (error: any) {
-    console.error('❌ CRITICAL ERROR during generation:', error);
-    console.error('Error type:', error.constructor.name);
-    console.error('Error message:', error?.message);
-    
-    // Log stack trace for debugging
-    if (error.stack) {
-      console.error('Stack trace:', error.stack);
-    }
-
-    // More detailed error information
-    if (error.response) {
-      console.error('API Response status:', error.response.status);
-      console.error('API Response data:', error.response.data);
-    }
-
-    return NextResponse.json(
-      {
-        error: 'Failed to generate avatar',
-        message: error?.message || 'Internal Server Error',
-        details: isProduction ? undefined : {
-          stack: error?.stack,
-          type: error.constructor.name
-        }
-      },
-      { status: 500 }
-    );
   }
-}
 
