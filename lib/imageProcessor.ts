@@ -37,19 +37,8 @@ export async function mergeImages(
     console.log('--- MERGE IMAGES DEBUG START ---');
     console.log('generatedImagePath:', generatedImagePath);
     console.log('Text Overlay:', { name, organization });
-    console.log('Node Env:', process.env.NODE_ENV);
 
-    // Create output directory
-    const isProduction = process.env.NODE_ENV === 'production';
-    const publicOutputDir = join(process.cwd(), 'public', 'final');
-    const tmpOutputDir = join('/tmp', 'final');
-    const outputDir = isProduction ? tmpOutputDir : publicOutputDir;
-
-    try {
-      await mkdir(outputDir, { recursive: true });
-    } catch (error) {
-      // Directory might already exist or be read-only
-    }
+    // Always upload to Supabase (no production/development check)
 
     // Load background image
     const backgroundPath = join(process.cwd(), 'public', 'background.png');
@@ -241,45 +230,34 @@ export async function mergeImages(
       .toBuffer();
 
     // Generate filename
+    const timestamp = Date.now();
     const timestamp_str = timestamp.toString();
     const outputFilename = `final-${timestamp_str}.png`;
 
-    // Save final image locally only in development
-    if (!isProduction) {
-      try {
-        const outputPath = join(outputDir, outputFilename);
-        await writeFile(outputPath, finalBuffer);
-        console.log('Final image saved locally:', outputPath);
-      } catch (err) {
-        console.warn('Could not save final image locally:', err);
-      }
-    }
-
-    // Upload final image to Supabase in production so it can be previewed and downloaded
-    if (isProduction) {
-      const { error: uploadError } = await supabaseAdmin.storage
-        .from('generated-images')
-        .upload(`final/${outputFilename}`, finalBuffer, {
-          contentType: 'image/png',
-          upsert: true,
+    // Always upload to Supabase (no development/production check)
+    console.log('Uploading final image to Supabase storage bucket: generated-images/final/');
+    console.log('Final buffer size:', finalBuffer.length, 'bytes');
+    
+    const { error: uploadError } = await supabaseAdmin.storage
+      .from('generated-images')
+      .upload(`final/${outputFilename}`, finalBuffer, {
+        contentType: 'image/png',
+        upsert: true,
         });
 
       if (uploadError) {
         console.error('Supabase final upload error:', uploadError);
-        throw new Error('Failed to upload final image');
+        console.error('Upload error details:', JSON.stringify(uploadError));
+        throw new Error(`Failed to upload final image: ${uploadError.message}`);
       }
 
       const { data: { publicUrl } } = supabaseAdmin.storage
         .from('generated-images')
         .getPublicUrl(`final/${outputFilename}`);
 
-      console.log('Final image uploaded:', publicUrl);
+      console.log('Final image uploaded successfully:', publicUrl);
       console.log('--- MERGE IMAGES DEBUG END - SUCCESS ---');
       return publicUrl;
-    }
-
-    console.log('--- MERGE IMAGES DEBUG END - SUCCESS ---');
-    return `/final/${outputFilename}`;
   } catch (error) {
     console.error('CRITICAL ERROR in mergeImages:', error);
     throw new Error(`Failed to merge images: ${error instanceof Error ? error.message : 'Unknown error'}`);

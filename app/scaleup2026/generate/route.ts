@@ -194,18 +194,31 @@ export async function POST(request: NextRequest) {
     // Call OpenRouter
     const prompt = PROMPTS[prompt_type as keyof typeof PROMPTS];
 
-    if (!process.env.OPENROUTER_API_KEY) {
-      throw new Error('OPENROUTER_API_KEY not configured');
+    const apiKey = process.env.OPENROUTER_API_KEY;
+    if (!apiKey) {
+      console.error('❌ OPENROUTER_API_KEY is not configured');
+      console.error('   - Set OPENROUTER_API_KEY in .env.local');
+      console.error('   - Get a key from: https://openrouter.ai/keys');
+      throw new Error('OPENROUTER_API_KEY not configured. Get one from https://openrouter.ai/keys');
+    }
+
+    if (apiKey === 'your_valid_openrouter_key_here' || apiKey.length < 10) {
+      console.error('❌ OPENROUTER_API_KEY is invalid or placeholder');
+      console.error('   - Current value:', apiKey);
+      console.error('   - Get a valid key from: https://openrouter.ai/keys');
+      throw new Error('OPENROUTER_API_KEY is invalid. Get a valid key from https://openrouter.ai/keys');
     }
 
     // Call OpenRouter
-    console.log('Sending prompt to OpenRouter:', prompt.substring(0, 100) + '...');
+    console.log('✓ OpenRouter API key found, sending request...');
+    console.log('  Prompt preview:', prompt.substring(0, 80) + '...');
     console.time('OpenRouter_AI_Call');
     const apiResponse = await fetch('https://openrouter.ai/api/v1/chat/completions', {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${process.env.OPENROUTER_API_KEY}`,
+        'Authorization': `Bearer ${apiKey}`,
         'Content-Type': 'application/json',
+        'HTTP-Referer': 'https://github.com/GKRBROS/conclave2026',
       },
       body: JSON.stringify({
         model: 'sourceful/riverflow-v2-fast-preview',
