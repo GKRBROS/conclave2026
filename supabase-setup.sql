@@ -83,6 +83,42 @@ BEGIN
   END IF;
 END $$;
 
+-- Add district column if it doesn't exist
+DO $$ 
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns 
+                 WHERE table_schema='public' AND table_name='generations' AND column_name='district') THEN
+    ALTER TABLE public.generations ADD COLUMN district TEXT;
+  END IF;
+END $$;
+
+-- Add category column if it doesn't exist
+DO $$ 
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns 
+                 WHERE table_schema='public' AND table_name='generations' AND column_name='category') THEN
+    ALTER TABLE public.generations ADD COLUMN category TEXT;
+  END IF;
+END $$;
+
+-- Add organization column if it doesn't exist
+DO $$ 
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns 
+                 WHERE table_schema='public' AND table_name='generations' AND column_name='organization') THEN
+    ALTER TABLE public.generations ADD COLUMN organization TEXT;
+  END IF;
+END $$;
+
+-- Drop designation column if it exists (replaced by organization)
+DO $$ 
+BEGIN
+  IF EXISTS (SELECT 1 FROM information_schema.columns 
+             WHERE table_schema='public' AND table_name='generations' AND column_name='designation') THEN
+    ALTER TABLE public.generations DROP COLUMN designation;
+  END IF;
+END $$;
+
 -- Add photo_url column if it doesn't exist
 DO $$ 
 BEGIN
@@ -136,12 +172,17 @@ END $$;
 
 -- Update NOT NULL constraints
 ALTER TABLE public.generations ALTER COLUMN name SET NOT NULL;
-ALTER TABLE public.generations ALTER COLUMN designation SET NOT NULL;
+ALTER TABLE public.generations ALTER COLUMN organization SET NOT NULL;
+ALTER TABLE public.generations ALTER COLUMN district SET NOT NULL;
+ALTER TABLE public.generations ALTER COLUMN category SET NOT NULL;
 
 -- Make new required columns NOT NULL (only if they have data or set defaults)
 -- Uncomment these after adding data or setting defaults:
 -- ALTER TABLE public.generations ALTER COLUMN email SET NOT NULL;
 -- ALTER TABLE public.generations ALTER COLUMN phone_no SET NOT NULL;
+-- ALTER TABLE public.generations ALTER COLUMN district SET NOT NULL;
+-- ALTER TABLE public.generations ALTER COLUMN category SET NOT NULL;
+-- ALTER TABLE public.generations ALTER COLUMN organization SET NOT NULL;
 -- ALTER TABLE public.generations ALTER COLUMN photo_url SET NOT NULL;
 -- ALTER TABLE public.generations ALTER COLUMN generated_image_url SET NOT NULL;
 
@@ -168,6 +209,18 @@ BEGIN
     CHECK (phone_no IS NULL OR phone_no ~* '^\+?[0-9]{10,15}$');
 END $$;
 
+-- Add category constraint
+DO $$ 
+BEGIN
+  -- Drop old constraint if exists
+  IF EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'category_format') THEN
+    ALTER TABLE public.generations DROP CONSTRAINT category_format;
+  END IF;
+  -- Add new constraint
+  ALTER TABLE public.generations ADD CONSTRAINT category_format 
+    CHECK (category IN ('Startups', 'Working Professionals', 'Students', 'Business Owners', 'NRI / Gulf Retunees', 'Government Officials'));
+END $$;
+
 -- Add prompt_type constraint
 DO $$ 
 BEGIN
@@ -190,7 +243,9 @@ CREATE TABLE IF NOT EXISTS public.generations (
   edit_name TEXT,
   email TEXT NOT NULL,
   phone_no TEXT NOT NULL,
-  designation TEXT NOT NULL,
+  district TEXT NOT NULL,
+  category TEXT NOT NULL,
+  organization TEXT NOT NULL,
   photo_url TEXT NOT NULL,
   generated_image_url TEXT NOT NULL,
   aws_key TEXT,
@@ -201,6 +256,7 @@ CREATE TABLE IF NOT EXISTS public.generations (
   -- Add constraints
   CONSTRAINT email_format CHECK (email ~* '^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$'),
   CONSTRAINT phone_format CHECK (phone_no ~* '^\+?[0-9]{10,15}$'),
+  CONSTRAINT category_format CHECK (category IN ('Startups', 'Working Professionals', 'Students', 'Business Owners', 'NRI / Gulf Retunees', 'Government Officials')),
   CONSTRAINT prompt_type_format CHECK (prompt_type IN ('prompt1', 'prompt2', 'prompt3'))
 );
 

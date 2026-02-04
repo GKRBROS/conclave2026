@@ -31,12 +31,12 @@ export async function mergeImages(
   generatedImagePath: string,
   timestamp: string,
   name?: string,
-  designation?: string
+  organization?: string
 ): Promise<string> {
   try {
     console.log('--- MERGE IMAGES DEBUG START ---');
     console.log('generatedImagePath:', generatedImagePath);
-    console.log('Text Overlay:', { name, designation });
+    console.log('Text Overlay:', { name, organization });
     console.log('Node Env:', process.env.NODE_ENV);
 
     // Create output directory
@@ -107,13 +107,13 @@ export async function mergeImages(
       }
     ];
 
-    if (name || designation) {
+    if (name || organization) {
       // Create text overlay using Canvas (better than SVG for text rendering)
       const canvasWidth = bgWidth;
       const canvasHeight = bgHeight;
 
       const nameText = name ? name.toUpperCase() : '';
-      const desText = designation ? designation.toLowerCase().replace(/\b\w/g, (char) => char.toUpperCase()) : '';
+      const desText = organization ? organization.toLowerCase().replace(/\b\w/g, (char) => char.toUpperCase()) : '';
 
       // Auto-scaling logic
       const maxWidth = 900;
