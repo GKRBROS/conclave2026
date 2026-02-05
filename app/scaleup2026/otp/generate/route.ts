@@ -1,8 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase/admin';
 import { OtpService, generateOTP } from '@/lib/otpService';
+import { corsHeaders, handleCorsOptions } from '@/lib/cors';
+
+export async function OPTIONS(request: NextRequest) {
+  return handleCorsOptions(request);
+}
 
 export async function POST(request: NextRequest) {
+  const origin = request.headers.get('origin') || undefined;
   try {
     const body = await request.json();
     const { phone_no } = body;
@@ -136,6 +142,8 @@ export async function POST(request: NextRequest) {
       expires_in_minutes: 10,
       // Only include OTP in response for development/testing
       ...(process.env.NODE_ENV !== 'production' && { otp: otp }),
+    }, {
+      headers: corsHeaders(origin),
     });
 
   } catch (error: any) {

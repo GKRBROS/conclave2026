@@ -1,9 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase/admin';
+import { corsHeaders, handleCorsOptions } from '@/lib/cors';
 
 const MAX_ATTEMPTS = 5; // Maximum OTP verification attempts
 
+export async function OPTIONS(request: NextRequest) {
+  return handleCorsOptions(request);
+}
+
 export async function POST(request: NextRequest) {
+  const origin = request.headers.get('origin') || undefined;
   try {
     const body = await request.json();
     const { phone_no, otp } = body;
@@ -140,6 +146,8 @@ export async function POST(request: NextRequest) {
       message: 'Phone number verified successfully',
       verified_at: updatedData.verified_at,
       user: userData || null,
+    }, {
+      headers: corsHeaders(origin),
     });
 
   } catch (error: any) {

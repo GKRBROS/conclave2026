@@ -1,7 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase/admin';
+import { corsHeaders, handleCorsOptions } from '@/lib/cors';
+
+export async function OPTIONS(request: NextRequest) {
+  return handleCorsOptions(request);
+}
 
 export async function PUT(request: NextRequest, { params }: { params: Promise<{ userId: string }> }) {
+  const origin = request.headers.get('origin') || undefined;
   try {
     const { userId } = await params;
     const body = await request.json();
@@ -62,6 +68,8 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
         organization: data.organization,
         updated_at: data.updated_at,
       },
+    }, {
+      headers: corsHeaders(origin),
     });
 
   } catch (error: any) {

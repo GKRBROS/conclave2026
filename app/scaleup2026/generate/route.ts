@@ -4,10 +4,15 @@ import { join } from 'path';
 import { mergeImages } from '@/lib/imageProcessor';
 import { supabaseAdmin } from '@/lib/supabase/admin';
 import { S3Service } from '@/lib/s3Service';
+import { corsHeaders, handleCorsOptions } from '@/lib/cors';
 import OpenAI from 'openai';
 import sharp from 'sharp';
 
 export const maxDuration = 60; // Increase timeout for long AI generation
+
+export async function OPTIONS(request: NextRequest) {
+  return handleCorsOptions(request);
+}
 
 // Validation constants
 // ============================================
@@ -30,6 +35,7 @@ const PROMPTS = {
 };
 
 export async function POST(request: NextRequest) {
+  const origin = request.headers.get('origin') || undefined;
   const isProduction = process.env.NODE_ENV === 'production';
   try {
     // Use admin client for database operations
@@ -335,6 +341,8 @@ export async function POST(request: NextRequest) {
       organization: dbData.organization,
       aws_key: dbData.aws_key,
       final_image_url: finalImagePath
+    }, {
+      headers: corsHeaders(origin),
     });
   } catch (error: any) {
     console.error('CRITICAL ERROR during generation:', error);
@@ -346,7 +354,10 @@ export async function POST(request: NextRequest) {
         error: error?.message || 'Internal Server Error',
         details: isProduction ? undefined : error?.stack
       },
-      { status: 500 }
+      { 
+        status: 500,
+        headers: corsHeaders(origin),
+      }
     );
   }
 }
