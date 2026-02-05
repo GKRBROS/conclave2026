@@ -6,7 +6,7 @@ import { supabaseAdmin } from '@/lib/supabase/admin';
 import OpenAI from 'openai';
 import sharp from 'sharp';
 
-export const maxDuration = 300; // 5 minutes timeout for long AI generation
+export const maxDuration = 60; // Increase timeout for long AI generation
 
 // 3 AI prompts for image generation
 const PROMPTS = {
@@ -31,8 +31,6 @@ const PHONE_REGEX = /^\+?[0-9]{10,15}$/;
 export async function POST(request: NextRequest) {
   const isProduction = process.env.NODE_ENV === 'production';
   try {
-    console.log('📝 [1/7] Starting avatar generation...');
-    
     // Use admin client for database operations
     const supabase = supabaseAdmin;
 
@@ -212,20 +210,12 @@ export async function POST(request: NextRequest) {
       throw new Error('OPENROUTER_API_KEY is invalid. Get a valid key from https://openrouter.ai/keys');
     }
 
-    // Call OpenRouter with timeout
+    // Call OpenRouter
     console.log('✓ OpenRouter API key found, sending request...');
     console.log('  Prompt preview:', prompt.substring(0, 80) + '...');
     console.time('OpenRouter_AI_Call');
-    
-    const controller = new AbortController();
-    const timeout = setTimeout(() => {
-      console.warn('⏱️ OpenRouter request timeout after 120 seconds');
-      controller.abort();
-    }, 120000); // 120 second timeout
-    
     const apiResponse = await fetch('https://openrouter.ai/api/v1/chat/completions', {
       method: 'POST',
-      signal: controller.signal,
       headers: {
         'Authorization': `Bearer ${apiKey}`,
         'Content-Type': 'application/json',
@@ -245,8 +235,6 @@ export async function POST(request: NextRequest) {
         modalities: ['image']
       }),
     });
-    
-    clearTimeout(timeout);
 
     if (!apiResponse.ok) {
       console.timeEnd('OpenRouter_AI_Call');
@@ -259,18 +247,7 @@ export async function POST(request: NextRequest) {
       throw new Error(`OpenRouter Error ${apiResponse.status}: ${errorDetail}`);
     }
 
-    const responseText = await apiResponse.text();
-    if (!responseText) {
-      throw new Error('OpenRouter returned an empty response body');
-    }
-
-    let result: any;
-    try {
-      result = JSON.parse(responseText);
-    } catch (parseError) {
-      console.error('Failed to parse OpenRouter JSON response:', responseText.slice(0, 500));
-      throw new Error('OpenRouter returned invalid JSON');
-    }
+    const result = await apiResponse.json();
     console.timeEnd('OpenRouter_AI_Call');
     const responseMessage = result.choices[0].message;
     let generatedImageUrl: string | undefined = responseMessage.images?.[0]?.image_url?.url;
@@ -284,17 +261,7 @@ export async function POST(request: NextRequest) {
     if (generatedImageUrl.startsWith('data:')) {
       imageBuffer = Buffer.from(generatedImageUrl.split(',')[1], 'base64');
     } else {
-      console.log('📥 Fetching generated image from URL...');
-      const imageController = new AbortController();
-      const imageTimeout = setTimeout(() => {
-        console.warn('⏱️ Image download timeout after 30 seconds');
-        imageController.abort();
-      }, 30000); // 30 second timeout
-      
-      const imageResponse = await fetch(generatedImageUrl, {
-        signal: imageController.signal
-      });
-      clearTimeout(imageTimeout);
+      const imageResponse = await fetch(generatedImageUrl);
       imageBuffer = Buffer.from(await imageResponse.arrayBuffer());
     }
 
@@ -342,41 +309,32 @@ export async function POST(request: NextRequest) {
     const finalImagePath = await mergeImages(tempGeneratedFile, timestamp.toString(), name, organization);
 
     // Save metadata to Supabase database
-    console.log('📝 Preparing database insert...');
-    const insertPayload = {
-      name: name.trim(),
-      email: email.trim(),
-      phone_no: phone_no.trim(),
-      district: district.trim(),
-      category: category.trim(),
-      organization: organization.trim(),
-      photo_url: uploadedImageUrl,
-      generated_image_url: finalImagePath,
-      aws_key: awsKey,
-      prompt_type: prompt_type
-    };
-    console.log('Insert payload:', insertPayload);
-
     const { data: dbData, error: dbError } = await supabase
       .from('generations')
-      .insert(insertPayload)
+      .insert({
+        name: name.trim(),
+        email: email.trim(),
+        phone_no: phone_no.trim(),
+        district: district.trim(),
+        category: category.trim(),
+        organization: organization.trim(),
+        photo_url: uploadedImageUrl,
+        generated_image_url: finalImagePath,
+        aws_key: awsKey,
+        prompt_type: prompt_type
+      })
       .select()
       .single();
 
     if (dbError) {
-      console.error('❌ Database insert error:', dbError);
-      console.error('   Error code:', dbError.code);
-      console.error('   Error message:', dbError.message);
-      console.error('   Full error:', JSON.stringify(dbError, null, 2));
+      console.error('Database insert error:', dbError);
       return NextResponse.json(
-        { error: 'Failed to save to database', details: dbError.message, code: dbError.code },
+        { error: 'Failed to save to database', details: dbError.message },
         { status: 500 }
       );
     }
 
-    console.log('✅ Saved to database successfully!');
-    console.log('   User ID:', dbData?.id);
-    console.log('   Generated Image URL:', dbData?.generated_image_url);
+    console.log('Saved to database:', dbData);
 
     return NextResponse.json({
       success: true,
@@ -389,29 +347,14 @@ export async function POST(request: NextRequest) {
       final_image_url: finalImagePath
     });
   } catch (error: any) {
-    console.error('❌ CRITICAL ERROR during generation:', error);
-    console.error('Error type:', error.constructor.name);
-    console.error('Error message:', error?.message);
-    
-    // Log stack trace for debugging
-    if (error.stack) {
-      console.error('Stack trace:', error.stack);
-    }
-
-    // More detailed error information
-    if (error.response) {
-      console.error('API Response status:', error.response.status);
-      console.error('API Response data:', error.response.data);
-    }
+    console.error('CRITICAL ERROR during generation:', error);
+    // Log stack trace for Vercel logs
+    if (error.stack) console.error(error.stack);
 
     return NextResponse.json(
       {
-        error: 'Failed to generate avatar',
-        message: error?.message || 'Internal Server Error',
-        details: isProduction ? undefined : {
-          stack: error?.stack,
-          type: error.constructor.name
-        }
+        error: error?.message || 'Internal Server Error',
+        details: isProduction ? undefined : error?.stack
       },
       { status: 500 }
     );
