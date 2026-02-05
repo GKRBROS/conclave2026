@@ -152,6 +152,7 @@ export async function POST(request: NextRequest) {
         await writeFile(join(publicUploadsPath, filename), buffer);
       } catch (err) {
         console.warn('Could not save to public/uploads (read-only FS):', err);
+      }
     }
 
     // Generate AWS S3 key
