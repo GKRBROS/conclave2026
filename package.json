@@ -9,6 +9,7 @@
     "lint": "next lint"
   },
   "dependencies": {
+    "@aws-sdk/client-sns": "^3.983.0",
     "@openrouter/sdk": "^0.3.16",
     "@supabase/supabase-js": "^2.93.3",
     "autoprefixer": "^10.4.23",
