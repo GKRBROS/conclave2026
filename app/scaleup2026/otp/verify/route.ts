@@ -18,21 +18,21 @@ export async function POST(request: NextRequest) {
     if (!phone_no || typeof phone_no !== 'string') {
       return NextResponse.json(
         { error: 'Phone number is required' },
-        { status: 400 }
+        { status: 400, headers: corsHeaders(origin) }
       );
     }
 
     if (!otp || typeof otp !== 'string') {
       return NextResponse.json(
         { error: 'OTP is required' },
-        { status: 400 }
+        { status: 400, headers: corsHeaders(origin) }
       );
     }
 
     if (otp.length !== 6 || !/^\d{6}$/.test(otp)) {
       return NextResponse.json(
         { error: 'Invalid OTP format. Must be 6 digits.' },
-        { status: 400 }
+        { status: 400, headers: corsHeaders(origin) }
       );
     }
 
@@ -49,7 +49,7 @@ export async function POST(request: NextRequest) {
       console.error('Verification record not found:', fetchError);
       return NextResponse.json(
         { error: 'No OTP found for this phone number. Please request a new OTP.' },
-        { status: 404 }
+        { status: 404, headers: corsHeaders(origin) }
       );
     }
 
@@ -60,6 +60,8 @@ export async function POST(request: NextRequest) {
         success: true,
         message: 'Phone number already verified',
         verified_at: verificationData.verified_at,
+      }, {
+        headers: corsHeaders(origin),
       });
     }
 
@@ -74,7 +76,7 @@ export async function POST(request: NextRequest) {
           error: 'OTP has expired. Please request a new OTP.',
           expired_at: verificationData.expires_at,
         },
-        { status: 400 }
+        { status: 400, headers: corsHeaders(origin) }
       );
     }
 
@@ -86,7 +88,7 @@ export async function POST(request: NextRequest) {
           error: 'Too many failed attempts. Please request a new OTP.',
           max_attempts: MAX_ATTEMPTS,
         },
-        { status: 429 }
+        { status: 429, headers: corsHeaders(origin) }
       );
     }
 
@@ -105,7 +107,7 @@ export async function POST(request: NextRequest) {
           error: 'Invalid OTP',
           attempts_remaining: MAX_ATTEMPTS - newAttempts,
         },
-        { status: 400 }
+        { status: 400, headers: corsHeaders(origin) }
       );
     }
 
@@ -126,7 +128,7 @@ export async function POST(request: NextRequest) {
       console.error('Failed to update verification status:', updateError);
       return NextResponse.json(
         { error: 'Failed to update verification status' },
-        { status: 500 }
+        { status: 500, headers: corsHeaders(origin) }
       );
     }
 
@@ -157,7 +159,7 @@ export async function POST(request: NextRequest) {
         error: 'Failed to verify OTP',
         details: error?.message || 'Unknown error',
       },
-      { status: 500 }
+      { status: 500, headers: corsHeaders(origin) }
     );
   }
 }

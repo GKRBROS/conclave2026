@@ -13,19 +13,23 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const { phone_no } = body;
 
+    console.log('📞 Received OTP request:', { phone_no, bodyType: typeof phone_no });
+
     // Validate phone number
     if (!phone_no || typeof phone_no !== 'string') {
+      console.error('❌ Phone number validation failed:', phone_no);
       return NextResponse.json(
         { error: 'Phone number is required' },
-        { status: 400 }
+        { status: 400, headers: corsHeaders(origin) }
       );
     }
 
     const phoneRegex = /^\+?[0-9]{10,15}$/;
     if (!phoneRegex.test(phone_no)) {
+      console.error('❌ Phone regex validation failed:', phone_no);
       return NextResponse.json(
         { error: 'Invalid phone number format. Must be 10-15 digits.' },
-        { status: 400 }
+        { status: 400, headers: corsHeaders(origin) }
       );
     }
 
@@ -42,7 +46,7 @@ export async function POST(request: NextRequest) {
       console.error('Phone number not found in generations:', genError);
       return NextResponse.json(
         { error: 'Phone number not registered. Please generate an avatar first.' },
-        { status: 404 }
+        { status: 404, headers: corsHeaders(origin) }
       );
     }
 
@@ -85,7 +89,7 @@ export async function POST(request: NextRequest) {
         console.error('Failed to update OTP:', updateError);
         return NextResponse.json(
           { error: 'Failed to update OTP', details: updateError.message },
-          { status: 500 }
+          { status: 500, headers: corsHeaders(origin) }
         );
       }
 
@@ -110,7 +114,7 @@ export async function POST(request: NextRequest) {
         console.error('Failed to insert OTP:', insertError);
         return NextResponse.json(
           { error: 'Failed to generate OTP', details: insertError.message },
-          { status: 500 }
+          { status: 500, headers: corsHeaders(origin) }
         );
       }
 
@@ -153,7 +157,7 @@ export async function POST(request: NextRequest) {
         error: 'Failed to generate OTP',
         details: error?.message || 'Unknown error',
       },
-      { status: 500 }
+      { status: 500, headers: corsHeaders(origin) }
     );
   }
 }
