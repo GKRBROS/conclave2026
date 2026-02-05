@@ -11,32 +11,44 @@ const snsClient = new SNSClient({
   },
 });
 
+export class OtpService {
+  static async sendOtp(phoneNumber: string, otpCode: string) {
+    try {
+      const message = `Your OTP code is: ${otpCode}. It will expire in 10 minutes.`;
+
+      const command = new PublishCommand({
+        Message: message,
+        PhoneNumber: phoneNumber,
+        MessageAttributes: {
+          'AWS.SNS.SMS.SMSType': {
+            DataType: 'String',
+            StringValue: 'Transactional',
+          },
+        },
+      });
+
+      const response = await snsClient.send(command);
+
+      return {
+        success: true,
+        message: 'OTP sent successfully',
+        messageId: response.MessageId,
+      };
+    } catch (error: any) {
+      console.error('Error sending OTP:', error.message);
+
+      return {
+        success: false,
+        message: 'Failed to send OTP',
+        error: error.message,
+      };
+    }
+  }
+}
+
 // Generate random 6-digit OTP
 function generateOTP(): string {
   return Math.floor(100000 + Math.random() * 900000).toString();
-}
-
-// Send SMS via AWS SNS
-async function sendSMS(phoneNumber: string, message: string): Promise<boolean> {
-  try {
-    // Format phone number with country code if not present
-    let formattedPhone = phoneNumber;
-    if (!phoneNumber.startsWith('+')) {
-      formattedPhone = `+91${phoneNumber}`; // Default to India (+91)
-    }
-
-    const command = new PublishCommand({
-      Message: message,
-      PhoneNumber: formattedPhone,
-    });
-
-    const response = await snsClient.send(command);
-    console.log('SMS sent successfully:', response.MessageId);
-    return true;
-  } catch (error) {
-    console.error('Failed to send SMS:', error);
-    return false;
-  }
 }
 
 export async function POST(request: NextRequest) {
@@ -152,10 +164,16 @@ export async function POST(request: NextRequest) {
     console.log('📤 Sending OTP via SMS...');
     const smsMessage = `Your Conclave 2026 verification code is: ${otp}. Valid for 10 minutes. Do not share this code.`;
     
-    const smsSent = await sendSMS(phone_no, smsMessage);
+    // Format phone number
+    let formattedPhone = phone_no;
+    if (!phone_no.startsWith('+')) {
+      formattedPhone = `+91${phone_no}`;
+    }
 
-    if (!smsSent) {
-      console.warn('⚠️ SMS sending failed, but OTP is stored in database');
+    const smsResult = await OtpService.sendOtp(formattedPhone, otp);
+
+    if (!smsResult.success) {
+      console.warn('⚠️ SMS sending failed:', smsResult.message);
       // Don't fail the request, OTP is still stored
     }
 

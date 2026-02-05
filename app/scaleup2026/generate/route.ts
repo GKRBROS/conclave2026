@@ -3,6 +3,7 @@ import { writeFile, mkdir } from 'fs/promises';
 import { join } from 'path';
 import { mergeImages } from '@/lib/imageProcessor';
 import { supabaseAdmin } from '@/lib/supabase/admin';
+import { S3Service } from '@/lib/s3Service';
 import OpenAI from 'openai';
 import sharp from 'sharp';
 
@@ -153,30 +154,22 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Generate AWS key (S3 compatible path)
-    const awsKey = `uploads/${timestamp}/${filename}`;
+    // Generate AWS S3 key
+    const s3Key = `uploads/${timestamp}/${filename}`;
 
-    // Upload to Supabase Storage
-    console.log('Uploading input to Supabase Storage...');
-    const { data: uploadData, error: uploadError } = await supabase.storage
-      .from('generated-images')
-      .upload(awsKey, buffer, {
-        contentType: image.type,
-        upsert: false
-      });
-
-    if (uploadError) {
-      console.error('Supabase upload error:', uploadError);
+    // Upload to AWS S3
+    console.log('📤 Uploading input to AWS S3...');
+    try {
+      const uploadedKey = await S3Service.uploadBuffer(buffer, 'uploads', filename, image.type);
+      uploadedImageUrl = S3Service.getPublicUrl(uploadedKey);
+      console.log('✅ Uploaded to S3:', uploadedImageUrl);
+    } catch (s3Error) {
+      console.error('S3 upload error:', s3Error);
       return NextResponse.json(
-        { error: 'Failed to upload image to storage' },
+        { error: 'Failed to upload image to S3' },
         { status: 500 }
       );
     }
-
-    const { data: { publicUrl } } = supabase.storage
-      .from('generated-images')
-      .getPublicUrl(awsKey);
-    uploadedImageUrl = publicUrl;
 
     // Resize image for OpenRouter
     console.log('Resizing input image for OpenRouter...');
@@ -319,7 +312,7 @@ export async function POST(request: NextRequest) {
         organization: organization.trim(),
         photo_url: uploadedImageUrl,
         generated_image_url: finalImagePath,
-        aws_key: awsKey,
+        aws_key: s3Key,
         prompt_type: prompt_type
       })
       .select()
