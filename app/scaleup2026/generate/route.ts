@@ -324,7 +324,7 @@ export async function POST(request: NextRequest) {
         error: error?.message || 'Internal Server Error',
         details: isProduction ? undefined : error?.stack
       },
-      { 
+      {
         status: 500,
         headers: corsHeaders(origin),
       }
