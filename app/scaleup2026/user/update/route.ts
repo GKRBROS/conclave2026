@@ -5,82 +5,82 @@ import { corsHeaders, handleCorsOptions } from '@/lib/cors';
 const PHONE_REGEX = /^\+?[0-9]{10,15}$/;
 
 export async function OPTIONS(request: NextRequest) {
-  return handleCorsOptions(request);
+    return handleCorsOptions(request);
 }
 
 export async function PUT(request: NextRequest) {
-  const origin = request.headers.get('origin') || undefined;
-  try {
-    const body = await request.json();
-    const { phone_no, name, organization } = body;
+    const origin = request.headers.get('origin') || undefined;
+    try {
+        const body = await request.json();
+        const { phone_no, name, organization } = body;
 
-    if (!phone_no || typeof phone_no !== 'string' || !PHONE_REGEX.test(phone_no)) {
-      return NextResponse.json(
-        { error: 'Valid phone number is required (10-15 digits)' },
-        { status: 400, headers: corsHeaders(origin) }
-      );
+        if (!phone_no || typeof phone_no !== 'string' || !PHONE_REGEX.test(phone_no)) {
+            return NextResponse.json(
+                { error: 'Valid phone number is required (10-15 digits)' },
+                { status: 400, headers: corsHeaders(origin) }
+            );
+        }
+
+        if (!name || typeof name !== 'string' || name.trim().length === 0) {
+            return NextResponse.json(
+                { error: 'Valid name is required' },
+                { status: 400, headers: corsHeaders(origin) }
+            );
+        }
+
+        if (!organization || typeof organization !== 'string' || organization.trim().length === 0) {
+            return NextResponse.json(
+                { error: 'Valid organization is required' },
+                { status: 400, headers: corsHeaders(origin) }
+            );
+        }
+
+        const { data, error } = await supabaseAdmin
+            .from('generations')
+            .update({
+                name: name.trim(),
+                organization: organization.trim(),
+                updated_at: new Date().toISOString(),
+            })
+            .eq('phone_no', phone_no.trim())
+            .select()
+            .single();
+
+        if (error) {
+            console.error('Failed to update user:', error);
+            return NextResponse.json(
+                { error: 'Failed to update user details', details: error.message },
+                { status: 500, headers: corsHeaders(origin) }
+            );
+        }
+
+        if (!data) {
+            return NextResponse.json(
+                { error: 'User not found' },
+                { status: 404, headers: corsHeaders(origin) }
+            );
+        }
+
+        return NextResponse.json({
+            success: true,
+            message: 'User details updated successfully',
+            user: {
+                id: data.id,
+                name: data.name,
+                organization: data.organization,
+                updated_at: data.updated_at,
+            },
+        }, {
+            headers: corsHeaders(origin),
+        });
+    } catch (error: any) {
+        console.error('Error updating user:', error);
+        return NextResponse.json(
+            {
+                error: 'Failed to update user details',
+                details: error?.message || 'Unknown error',
+            },
+            { status: 500, headers: corsHeaders(origin) }
+        );
     }
-
-    if (!name || typeof name !== 'string' || name.trim().length === 0) {
-      return NextResponse.json(
-        { error: 'Valid name is required' },
-        { status: 400, headers: corsHeaders(origin) }
-      );
-    }
-
-    if (!organization || typeof organization !== 'string' || organization.trim().length === 0) {
-      return NextResponse.json(
-        { error: 'Valid organization is required' },
-        { status: 400, headers: corsHeaders(origin) }
-      );
-    }
-
-    const { data, error } = await supabaseAdmin
-      .from('generations')
-      .update({
-        name: name.trim(),
-        organization: organization.trim(),
-        updated_at: new Date().toISOString(),
-      })
-      .eq('phone_no', phone_no.trim())
-      .select()
-      .single();
-
-    if (error) {
-      console.error('Failed to update user:', error);
-      return NextResponse.json(
-        { error: 'Failed to update user details', details: error.message },
-        { status: 500, headers: corsHeaders(origin) }
-      );
-    }
-
-    if (!data) {
-      return NextResponse.json(
-        { error: 'User not found' },
-        { status: 404, headers: corsHeaders(origin) }
-      );
-    }
-
-    return NextResponse.json({
-      success: true,
-      message: 'User details updated successfully',
-      user: {
-        id: data.id,
-        name: data.name,
-        organization: data.organization,
-        updated_at: data.updated_at,
-      },
-    }, {
-      headers: corsHeaders(origin),
-    });
-  } catch (error: any) {
-    console.error('Error updating user:', error);
-    return NextResponse.json(
-      {
-        error: 'Failed to update user details',
-        details: error?.message || 'Unknown error',
-      },
-      { status: 500, headers: corsHeaders(origin) }
-    );
-  }
 }
