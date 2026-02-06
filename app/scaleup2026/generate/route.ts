@@ -24,8 +24,6 @@ const ALLOWED_IMAGE_FORMATS = ['image/jpeg', 'image/jpg', 'image/png']; // Suppo
 // ============================================
 // FIELD VALIDATION PATTERNS
 // ============================================
-const EMAIL_REGEX = /^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$/;
-const PHONE_REGEX = /^\+?[0-9]{10,15}$/;
 
 // Prompt templates
 const PROMPTS = {
@@ -44,10 +42,10 @@ export async function POST(request: NextRequest) {
     const formData = await request.formData();
     const image = formData.get('photo') as File;
     const name = formData.get('name') as string;
-    const email = formData.get('email') as string;
-    const phone_no = formData.get('phone_no') as string;
-    const district = formData.get('district') as string;
-    const category = formData.get('category') as string;
+    const email = formData.get('email') as string | null;
+    const phone_no = formData.get('phone_no') as string | null;
+    const district = formData.get('district') as string | null;
+    const category = formData.get('category') as string | null;
     const organization = formData.get('organization') as string;
     const prompt_type = formData.get('prompt_type') as string;
 
@@ -62,34 +60,6 @@ export async function POST(request: NextRequest) {
     if (!name || name.trim().length === 0) {
       return NextResponse.json(
         { error: 'Name is required' },
-        { status: 400 }
-      );
-    }
-
-    if (!email || !EMAIL_REGEX.test(email)) {
-      return NextResponse.json(
-        { error: 'Valid email is required' },
-        { status: 400 }
-      );
-    }
-
-    if (!phone_no || !PHONE_REGEX.test(phone_no)) {
-      return NextResponse.json(
-        { error: 'Valid phone number is required (10-15 digits)' },
-        { status: 400 }
-      );
-    }
-
-    if (!district || district.trim().length === 0) {
-      return NextResponse.json(
-        { error: 'District is required' },
-        { status: 400 }
-      );
-    }
-
-    if (!category || !['Startups', 'Working Professionals', 'Students', 'Business Owners', 'NRI / Gulf Retunees', 'Government Officials'].includes(category)) {
-      return NextResponse.json(
-        { error: 'Valid category is required' },
         { status: 400 }
       );
     }
@@ -311,10 +281,10 @@ export async function POST(request: NextRequest) {
       .from('generations')
       .insert({
         name: name.trim(),
-        email: email.trim(),
-        phone_no: phone_no.trim(),
-        district: district.trim(),
-        category: category.trim(),
+        email: email ? email.trim() : null,
+        phone_no: phone_no ? phone_no.trim() : null,
+        district: district ? district.trim() : null,
+        category: category ? category.trim() : null,
         organization: organization.trim(),
         photo_url: uploadedImageUrl,
         generated_image_url: finalImagePath,
