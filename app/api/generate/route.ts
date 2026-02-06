@@ -249,22 +249,18 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Upload to Supabase Storage
-    console.log('Uploading generated image to Supabase Storage...');
-    const { data: genData, error: genError } = await supabase.storage
-      .from('generated-images')
-      .upload(`generated/${generatedFilename}`, imageBuffer, {
-        contentType: 'image/png',
-        upsert: false
-      });
-
-    if (genError) {
-      console.error('Supabase generated upload error:', genError);
-    } else {
-      const { data: { publicUrl } } = supabase.storage
-        .from('generated-images')
-        .getPublicUrl(`generated/${generatedFilename}`);
-      finalGeneratedUrl = publicUrl;
+    console.log('Uploading generated image to S3...');
+    try {
+      const generatedKey = await S3Service.uploadBuffer(
+        imageBuffer,
+        'generated',
+        generatedFilename,
+        'image/png'
+      );
+      finalGeneratedUrl = S3Service.getPublicUrl(generatedKey);
+      console.log('✅ Generated image uploaded to S3:', finalGeneratedUrl);
+    } catch (s3GenError) {
+      console.error('S3 generated upload error:', s3GenError);
     }
 
     // Merge with background
@@ -295,7 +291,7 @@ export async function POST(request: NextRequest) {
             organization: organization.trim(),
             photo_url: uploadedImageUrl,
             generated_image_url: finalImagePath,
-            aws_key: s3Key,
+            aws_key: finalGeneratedUrl,
             prompt_type: prompt_type,
             updated_at: new Date().toISOString()
           })
@@ -319,7 +315,7 @@ export async function POST(request: NextRequest) {
             organization: organization.trim(),
             photo_url: uploadedImageUrl,
             generated_image_url: finalImagePath,
-            aws_key: s3Key,
+            aws_key: finalGeneratedUrl,
             prompt_type: prompt_type
           })
           .select()
@@ -342,7 +338,7 @@ export async function POST(request: NextRequest) {
           organization: organization.trim(),
           photo_url: uploadedImageUrl,
           generated_image_url: finalImagePath,
-          aws_key: s3Key,
+          aws_key: finalGeneratedUrl,
           prompt_type: prompt_type
         })
         .select()
@@ -369,7 +365,7 @@ export async function POST(request: NextRequest) {
       organization: dbData.organization,
       aws_key: dbData.aws_key,
       photo_url: uploadedImageUrl,
-      generated_image_url: finalGeneratedUrl,
+      generated_image_url: finalImagePath,
       final_image_url: finalImagePath
     });
   } catch (error: any) {

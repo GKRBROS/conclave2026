@@ -40,6 +40,17 @@ export async function GET(
             );
         }
 
+        if (!data?.generated_image_url) {
+            return NextResponse.json(
+                {
+                    error: 'Backend processing',
+                    details: 'Image is being generated. Please wait and try retrieving the result.',
+                    status: 504
+                },
+                { status: 202 }
+            );
+        }
+
         // Return only the final image URL
         return NextResponse.json({
             success: true,

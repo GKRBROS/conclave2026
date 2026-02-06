@@ -254,22 +254,18 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Upload to Supabase Storage
-    console.log('Uploading generated image to Supabase Storage...');
-    const { data: genData, error: genError } = await supabase.storage
-      .from('generated-images')
-      .upload(`generated/${generatedFilename}`, imageBuffer, {
-        contentType: 'image/png',
-        upsert: false
-      });
-
-    if (genError) {
-      console.error('Supabase generated upload error:', genError);
-    } else {
-      const { data: { publicUrl } } = supabase.storage
-        .from('generated-images')
-        .getPublicUrl(`generated/${generatedFilename}`);
-      finalGeneratedUrl = publicUrl;
+    console.log('Uploading generated image to S3...');
+    try {
+      const generatedKey = await S3Service.uploadBuffer(
+        imageBuffer,
+        'generated',
+        generatedFilename,
+        'image/png'
+      );
+      finalGeneratedUrl = S3Service.getPublicUrl(generatedKey);
+      console.log('✅ Generated image uploaded to S3:', finalGeneratedUrl);
+    } catch (s3GenError) {
+      console.error('S3 generated upload error:', s3GenError);
     }
 
     // Merge with background
@@ -278,18 +274,18 @@ export async function POST(request: NextRequest) {
 
     // Save metadata to Supabase database
     let dbData, dbError;
-    
+
     // If phone_no is provided, try to update existing user
     if (phone_no && phone_no.trim().length > 0) {
       console.log(`📱 Searching for existing user with phone: ${phone_no}`);
-      
+
       // Check if user exists
       const { data: existingUser, error: searchError } = await supabase
         .from('generations')
         .select('*')
         .eq('phone_no', phone_no.trim())
         .single();
-      
+
       if (!searchError && existingUser) {
         // User exists, update their record
         console.log('✓ Found existing user, updating record...');
@@ -300,14 +296,14 @@ export async function POST(request: NextRequest) {
             organization: organization.trim(),
             photo_url: uploadedImageUrl,
             generated_image_url: finalImagePath,
-            aws_key: s3Key,
+            aws_key: finalGeneratedUrl,
             prompt_type: prompt_type,
             updated_at: new Date().toISOString()
           })
           .eq('phone_no', phone_no.trim())
           .select()
           .single();
-        
+
         dbData = updateData;
         dbError = updateError;
       } else {
@@ -324,12 +320,12 @@ export async function POST(request: NextRequest) {
             organization: organization.trim(),
             photo_url: uploadedImageUrl,
             generated_image_url: finalImagePath,
-            aws_key: s3Key,
+            aws_key: finalGeneratedUrl,
             prompt_type: prompt_type
           })
           .select()
           .single();
-        
+
         dbData = insertData;
         dbError = insertError;
       }
@@ -347,12 +343,12 @@ export async function POST(request: NextRequest) {
           organization: organization.trim(),
           photo_url: uploadedImageUrl,
           generated_image_url: finalImagePath,
-          aws_key: s3Key,
+          aws_key: finalGeneratedUrl,
           prompt_type: prompt_type
         })
         .select()
         .single();
-      
+
       dbData = insertData;
       dbError = insertError;
     }
@@ -376,6 +372,7 @@ export async function POST(request: NextRequest) {
       name: dbData.name,
       organization: dbData.organization,
       aws_key: dbData.aws_key,
+      generated_image_url: finalImagePath,
       final_image_url: finalImagePath
     }, {
       headers: corsHeaders(origin),
