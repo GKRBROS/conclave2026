@@ -1,7 +1,7 @@
 # Conclave 2026 - API Routes Documentation
 
 ## Overview
-Complete API routing guide for avatar generation, OTP verification, and user management.
+Complete API routing guide for registration, avatar generation, OTP verification, and user management.
 
 ---
 
@@ -12,20 +12,21 @@ Complete API routing guide for avatar generation, OTP verification, and user man
 - **Timeout:** 300s (5 minutes)
 - **Storage:** AWS S3 (frameforge bucket)
 - **AI Model:** sourceful/riverflow-v2-fast-preview
+- **Search & Update:** If `phone_no` is provided, searches for existing user and **updates** their record; otherwise **creates** new record
 
 **Request:**
 ```
 Content-Type: multipart/form-data
 
 Fields:
-- photo (File) - JPEG/PNG, max 2MB
+- photo (File) - JPEG/PNG, max 2MB - Required
 - name (string) - Required
-- email (string) - Valid email required
-- phone_no (string) - 10-15 digits with optional +
-- district (string) - Required
-- category (string) - One of: Startups, Working Professionals, Students, Business Owners, NRI / Gulf Retunees, Government Officials
 - organization (string) - Required
-- prompt_type (string) - One of: prompt1, prompt2, prompt3
+- prompt_type (string) - One of: prompt1, prompt2, prompt3 - Required
+- phone_no (string) - Optional, used to search and update existing user (10-15 digits with optional +)
+- email (string) - Optional
+- district (string) - Optional
+- category (string) - Optional, one of: Startups, Working Professionals, Students, Business Owners, NRI / Gulf Retunees, Government Officials
 ```
 
 **Response:**
@@ -36,18 +37,23 @@ Fields:
   "name": "John Doe",
   "organization": "TechCorp",
   "aws_key": "uploads/timestamp/filename",
-  "photo_url": "s3-url",
-  "generated_image_url": "s3-url",
   "final_image_url": "s3-url"
 }
 ```
 
+**Behavior:**
+- **If phone_no is provided:** Searches for existing user with that phone_no
+  - **Found:** Updates user's name, organization, photo, and generated_image_url
+  - **Not found:** Creates new record with phone_no
+- **If phone_no is not provided:** Always creates new record (backward compatible)
+
 ### Conclave 2026 Route (Superhero)
 **POST** `/scaleup2026/generate`
-- **Timeout:** 600s (10 minutes)
+- **Timeout:** 600s (10 minutes) - Extended for slower connections
 - **Storage:** AWS S3 (frameforge bucket)
 - **AI Model:** sourceful/riverflow-v2-fast-preview
 - **Specialization:** Superhero/Professional style avatars
+- **Search & Update:** If `phone_no` is provided, searches for existing user and **updates** their record
 
 **Same request/response as `/api/generate`**
 
@@ -179,14 +185,57 @@ Fields:
 
 ---
 
-## 4. User Update Endpoints
+## 4. Registration Endpoint (Scaleup2026)
 
-### Standard Route
-**PUT** `/api/user/[userId]/update`
+### Conclave 2026 Route
+**POST** `/scaleup2026/register`
 
 **Request:**
 ```json
 {
+  "name": "John Doe",
+  "email": "john@example.com",
+  "phone_no": "+919876543210",
+  "district": "Kannur",
+  "category": "Students",
+  "organization": "tfg"
+}
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "user_id": "uuid",
+  "name": "John Doe",
+  "organization": "tfg"
+}
+```
+
+**Error Responses:**
+```json
+// Validation error
+{
+  "error": "Valid email is required"
+}
+
+// Database error
+{
+  "error": "Failed to save data"
+}
+```
+
+---
+
+## 5. User Update Endpoints
+
+### Standard Route
+**PUT** `/api/user/update`
+
+**Request:**
+```json
+{
+  "phone_no": "+919876543210",
   "name": "Updated Name",
   "organization": "Updated Company"
 }
@@ -210,7 +259,7 @@ Fields:
 ```json
 // Invalid input
 {
-  "error": "Valid name is required"
+  "error": "Valid phone number is required (10-15 digits)"
 }
 
 // User not found
@@ -221,13 +270,13 @@ Fields:
 ```
 
 ### Conclave 2026 Route
-**PUT** `/scaleup2026/user/[userId]/update`
+**PUT** `/scaleup2026/user/update`
 
-**Same request/response as `/api/user/[userId]/update`**
+**Same request/response as `/api/user/update`**
 
 ---
 
-## 5. Prompt Types for Avatar Generation
+## 6. Prompt Types for Avatar Generation
 
 ### prompt1 - Superhero Style
 - DC-style realism
@@ -252,7 +301,7 @@ Fields:
 
 ---
 
-## 6. Database Tables
+## 7. Database Tables
 
 ### generations table
 ```
@@ -286,7 +335,7 @@ attempts (integer)
 
 ---
 
-## 7. Environment Variables Required
+## 8. Environment Variables Required
 
 ```env
 # AWS S3
@@ -308,27 +357,26 @@ NODE_ENV=production
 
 ---
 
-## 8. Complete API Workflow Example
+## 9. Complete API Workflow Example
 
-### Step 1: Generate Avatar
+### Workflow 1: Generate Avatar with Phone Number (Updates Existing User)
 ```bash
+# Step 1: Register or call generate with phone_no to create/update user
 POST /scaleup2026/generate
 Content-Type: multipart/form-data
 
 name=John Doe
-email=john@example.com
-phone_no=+919876543210
-district=Maharashtra
-category=Startups
 organization=TechCorp
 prompt_type=prompt1
+phone_no=+919876543210
 photo=<image_file>
 ```
 
-**Response includes:** user_id, final_image_url
+**Response includes:** user_id (either newly created or existing)
+**Result:** If user with this phone_no exists, their record is updated; otherwise, new record is created
 
-### Step 2: Request OTP
 ```bash
+# Step 2: Request OTP (for verification)
 POST /scaleup2026/otp/generate
 Content-Type: application/json
 
@@ -337,10 +385,8 @@ Content-Type: application/json
 }
 ```
 
-**Response includes:** otp (in dev mode), expires_in_minutes
-
-### Step 3: Verify OTP
 ```bash
+# Step 3: Verify OTP
 POST /scaleup2026/otp/verify
 Content-Type: application/json
 
@@ -350,24 +396,63 @@ Content-Type: application/json
 }
 ```
 
-**Response includes:** verified_at, user details
-
-### Step 4: Update User (Optional)
+### Workflow 2: Multi-Step Registration + Generation
 ```bash
-PUT /scaleup2026/user/{user_id}/update
+# Step 1: Register User Details (Upfront)
+POST /scaleup2026/register
 Content-Type: application/json
 
 {
-  "name": "Updated Name",
-  "organization": "Updated Company"
+  "name": "John Doe",
+  "email": "john@example.com",
+  "phone_no": "+919876543210",
+  "district": "Kannur",
+  "category": "Students",
+  "organization": "tfg"
 }
 ```
 
-**Response includes:** updated user object
+**Response includes:** user_id
+
+```bash
+# Step 2: Generate Avatar (User phone_no already known)
+POST /scaleup2026/generate
+Content-Type: multipart/form-data
+
+name=John Doe
+organization=tfg
+prompt_type=prompt1
+phone_no=+919876543210
+photo=<image_file>
+```
+
+**Response includes:** user_id, final_image_url  
+**Result:** User's avatar is generated and existing record is updated
+
+```bash
+# Step 3: Request OTP
+POST /scaleup2026/otp/generate
+Content-Type: application/json
+
+{
+  "phone_no": "+919876543210"
+}
+```
+
+```bash
+# Step 4: Verify OTP
+POST /scaleup2026/otp/verify
+Content-Type: application/json
+
+{
+  "phone_no": "+919876543210",
+  "otp": "123456"
+}
+```
 
 ---
 
-## 9. Error Handling
+## 10. Error Handling
 
 All endpoints return standard error format:
 ```json
@@ -388,7 +473,7 @@ All endpoints return standard error format:
 
 ---
 
-## 10. Rate Limiting & Timeouts
+## 11. Rate Limiting & Timeouts
 
 | Endpoint | Timeout | Rate Limit |
 |----------|---------|-----------|
@@ -398,6 +483,7 @@ All endpoints return standard error format:
 | `/scaleup2026/otp/generate` | 30s | None |
 | `/api/otp/verify` | 30s | 5 attempts max |
 | `/scaleup2026/otp/verify` | 30s | 5 attempts max |
+| `/scaleup2026/register` | 30s | None |
 | OTP Expiration | - | 10 minutes |
 
 ---
@@ -445,10 +531,10 @@ All endpoints return standard error format:
       "name": "Update User",
       "request": {
         "method": "PUT",
-        "url": "http://localhost:3000/scaleup2026/user/USER_ID/update",
+        "url": "http://localhost:3000/scaleup2026/user/update",
         "body": {
           "mode": "raw",
-          "raw": "{\"name\": \"Updated Name\", \"organization\": \"Updated Org\"}"
+          "raw": "{\"phone_no\": \"+919876543210\", \"name\": \"Updated Name\", \"organization\": \"Updated Org\"}"
         }
       }
     }

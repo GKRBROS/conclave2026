@@ -272,25 +272,88 @@ export async function POST(request: NextRequest) {
     const finalImagePath = await mergeImages(tempGeneratedFile, timestamp.toString(), name, organization);
 
     // Save metadata to Supabase database
-    const { data: dbData, error: dbError } = await supabase
-      .from('generations')
-      .insert({
-        name: name.trim(),
-        email: email ? email.trim() : null,
-        phone_no: phone_no ? phone_no.trim() : null,
-        district: district ? district.trim() : null,
-        category: category ? category.trim() : null,
-        organization: organization.trim(),
-        photo_url: uploadedImageUrl,
-        generated_image_url: finalImagePath,
-        aws_key: s3Key,
-        prompt_type: prompt_type
-      })
-      .select()
-      .single();
+    let dbData, dbError;
+    
+    // If phone_no is provided, try to update existing user
+    if (phone_no && phone_no.trim().length > 0) {
+      console.log(`📱 Searching for existing user with phone: ${phone_no}`);
+      
+      // Check if user exists
+      const { data: existingUser, error: searchError } = await supabase
+        .from('generations')
+        .select('*')
+        .eq('phone_no', phone_no.trim())
+        .single();
+      
+      if (!searchError && existingUser) {
+        // User exists, update their record
+        console.log('✓ Found existing user, updating record...');
+        const { data: updateData, error: updateError } = await supabase
+          .from('generations')
+          .update({
+            name: name.trim(),
+            organization: organization.trim(),
+            photo_url: uploadedImageUrl,
+            generated_image_url: finalImagePath,
+            aws_key: s3Key,
+            prompt_type: prompt_type,
+            updated_at: new Date().toISOString()
+          })
+          .eq('phone_no', phone_no.trim())
+          .select()
+          .single();
+        
+        dbData = updateData;
+        dbError = updateError;
+      } else {
+        // User not found, create new record
+        console.log('✓ No existing user found, creating new record...');
+        const { data: insertData, error: insertError } = await supabase
+          .from('generations')
+          .insert({
+            name: name.trim(),
+            email: email ? email.trim() : null,
+            phone_no: phone_no.trim(),
+            district: district ? district.trim() : null,
+            category: category ? category.trim() : null,
+            organization: organization.trim(),
+            photo_url: uploadedImageUrl,
+            generated_image_url: finalImagePath,
+            aws_key: s3Key,
+            prompt_type: prompt_type
+          })
+          .select()
+          .single();
+        
+        dbData = insertData;
+        dbError = insertError;
+      }
+    } else {
+      // No phone_no provided, create new record
+      console.log('✓ No phone number provided, creating new record...');
+      const { data: insertData, error: insertError } = await supabase
+        .from('generations')
+        .insert({
+          name: name.trim(),
+          email: email ? email.trim() : null,
+          phone_no: null,
+          district: district ? district.trim() : null,
+          category: category ? category.trim() : null,
+          organization: organization.trim(),
+          photo_url: uploadedImageUrl,
+          generated_image_url: finalImagePath,
+          aws_key: s3Key,
+          prompt_type: prompt_type
+        })
+        .select()
+        .single();
+      
+      dbData = insertData;
+      dbError = insertError;
+    }
 
     if (dbError) {
-      console.error('Database insert error:', dbError);
+      console.error('Database error:', dbError);
       return NextResponse.json(
         { error: 'Failed to save to database', details: dbError.message },
         { status: 500 }
