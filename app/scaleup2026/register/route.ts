@@ -65,17 +65,69 @@ export async function POST(request: NextRequest) {
             );
         }
 
+        const trimmedPhone = phone_no.trim();
+        const trimmedEmail = email.trim();
+
+        const { data: existingUser, error: existingError } = await supabaseAdmin
+            .from('generations')
+            .select('id, name, organization')
+            .eq('phone_no', trimmedPhone)
+            .maybeSingle();
+
+        if (existingError) {
+            console.error('Database lookup error:', existingError);
+            return NextResponse.json(
+                { error: 'Failed to lookup user', details: existingError.message },
+                { status: 500, headers: corsHeaders(origin) }
+            );
+        }
+
+        if (existingUser) {
+            const { data: updatedUser, error: updateError } = await supabaseAdmin
+                .from('generations')
+                .update({
+                    name: name.trim(),
+                    email: trimmedEmail,
+                    phone_no: trimmedPhone,
+                    district: district.trim(),
+                    category: category.trim(),
+                    organization: organization.trim(),
+                    updated_at: new Date().toISOString(),
+                })
+                .eq('id', existingUser.id)
+                .select('id, name, organization')
+                .single();
+
+            if (updateError) {
+                console.error('Database update error:', updateError);
+                return NextResponse.json(
+                    { error: 'Failed to update user', details: updateError.message },
+                    { status: 500, headers: corsHeaders(origin) }
+                );
+            }
+
+            return NextResponse.json(
+                {
+                    success: true,
+                    user_id: updatedUser.id,
+                    name: updatedUser.name,
+                    organization: updatedUser.organization,
+                },
+                { headers: corsHeaders(origin) }
+            );
+        }
+
         const { data, error } = await supabaseAdmin
             .from('generations')
             .insert({
                 name: name.trim(),
-                email: email.trim(),
-                phone_no: phone_no.trim(),
+                email: trimmedEmail,
+                phone_no: trimmedPhone,
                 district: district.trim(),
                 category: category.trim(),
                 organization: organization.trim(),
             })
-            .select()
+            .select('id, name, organization')
             .single();
 
         if (error) {

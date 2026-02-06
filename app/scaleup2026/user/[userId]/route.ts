@@ -8,11 +8,11 @@ export async function GET(
   try {
     const { userId } = await params;
 
-    // Validate UUID format
-    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-    if (!uuidRegex.test(userId)) {
+    // Validate phone number format
+    const phoneRegex = /^\+?[0-9]{10,15}$/;
+    if (!phoneRegex.test(userId)) {
       return NextResponse.json(
-        { error: 'Invalid user ID format' },
+        { error: 'Invalid phone number format' },
         { status: 400 }
       );
     }
@@ -23,7 +23,7 @@ export async function GET(
     const { data, error } = await supabase
       .from('generations')
       .select('generated_image_url')
-      .eq('id', userId)
+      .eq('phone_no', userId)
       .single();
 
     if (error) {

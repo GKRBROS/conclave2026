@@ -8,7 +8,7 @@ import { corsHeaders, handleCorsOptions } from '@/lib/cors';
 import OpenAI from 'openai';
 import sharp from 'sharp';
 
-export const maxDuration = 60; // Increase timeout for long AI generation
+export const maxDuration = 600; // Increase timeout for long AI generation
 
 export async function OPTIONS(request: NextRequest) {
   return handleCorsOptions(request);
