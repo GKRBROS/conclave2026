@@ -49,12 +49,14 @@ export async function POST(request: NextRequest) {
 
     // Step 2: Check if already verified
     if (verificationData.verified) {
-      console.log('✅ Phone number already verified');
-      return NextResponse.json({
-        success: true,
-        message: 'Phone number already verified',
-        verified_at: verificationData.verified_at,
-      });
+      console.log('⚠️ Phone number already verified - require new OTP');
+      return NextResponse.json(
+        {
+          error: 'Phone number already verified. Please request a new OTP to verify again.',
+          verified_at: verificationData.verified_at,
+        },
+        { status: 409 }
+      );
     }
 
     // Step 3: Check if OTP expired

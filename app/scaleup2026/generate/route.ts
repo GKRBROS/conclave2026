@@ -236,6 +236,7 @@ export async function POST(request: NextRequest) {
     // Save intermediate image
     const generatedFilename = `generated-${timestamp}.png`;
     let finalGeneratedUrl = `/generated/${generatedFilename}`;
+    let generatedKey: string | null = null;
 
     // Save to /tmp
     const tmpGeneratedPath = join('/tmp', 'generated');
@@ -256,7 +257,7 @@ export async function POST(request: NextRequest) {
 
     console.log('Uploading generated image to S3...');
     try {
-      const generatedKey = await S3Service.uploadBuffer(
+      generatedKey = await S3Service.uploadBuffer(
         imageBuffer,
         'generated',
         generatedFilename,
@@ -296,7 +297,7 @@ export async function POST(request: NextRequest) {
             organization: organization.trim(),
             photo_url: uploadedImageUrl,
             generated_image_url: finalImagePath,
-            aws_key: finalGeneratedUrl,
+            aws_key: generatedKey,
             prompt_type: prompt_type,
             updated_at: new Date().toISOString()
           })
@@ -320,7 +321,7 @@ export async function POST(request: NextRequest) {
             organization: organization.trim(),
             photo_url: uploadedImageUrl,
             generated_image_url: finalImagePath,
-            aws_key: finalGeneratedUrl,
+            aws_key: generatedKey,
             prompt_type: prompt_type
           })
           .select()
@@ -343,7 +344,7 @@ export async function POST(request: NextRequest) {
           organization: organization.trim(),
           photo_url: uploadedImageUrl,
           generated_image_url: finalImagePath,
-          aws_key: finalGeneratedUrl,
+          aws_key: generatedKey,
           prompt_type: prompt_type
         })
         .select()
