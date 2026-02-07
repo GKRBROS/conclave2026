@@ -72,6 +72,13 @@ export async function POST(request: NextRequest) {
     // Step 3: Check if already verified
     if (verificationData.verified) {
       console.log('⚠️ Phone number already verified - require new OTP');
+      await supabaseAdmin
+        .from('verification')
+        .update({
+          verified: false,
+          verified_at: null,
+        })
+        .eq('phone_no', phone_no);
       return NextResponse.json(
         {
           error: 'Phone number already verified. Please request a new OTP to verify again.',

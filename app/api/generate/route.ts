@@ -116,6 +116,7 @@ export async function POST(request: NextRequest) {
 
     // Save locally for debug/local preview (optional and non-blocking in prod)
     let uploadedImageUrl = `/uploads/${filename}`;
+    let uploadedKey: string | null = null;
     if (!isProduction) {
       try {
         await mkdir(publicUploadsPath, { recursive: true }).catch(() => { });
@@ -131,7 +132,7 @@ export async function POST(request: NextRequest) {
     // Upload to AWS S3
     console.log('📤 Uploading input to AWS S3...');
     try {
-      const uploadedKey = await S3Service.uploadBuffer(buffer, 'uploads', filename, image.type);
+      uploadedKey = await S3Service.uploadBuffer(buffer, 'uploads', filename, image.type);
       uploadedImageUrl = S3Service.getPublicUrl(uploadedKey);
       console.log('✅ Uploaded to S3:', uploadedImageUrl);
     } catch (s3Error) {
@@ -268,6 +269,23 @@ export async function POST(request: NextRequest) {
     // Pass the /tmp path for processing
     const finalImagePath = await mergeImages(tempGeneratedFile, timestamp.toString(), name, organization);
 
+    let finalImagePresignedUrl = finalImagePath;
+    try {
+      const finalKey = new URL(finalImagePath).pathname.replace(/^\//, '');
+      finalImagePresignedUrl = await S3Service.getPresignedUrl(finalKey, 3600);
+    } catch (presignError) {
+      console.warn('Failed to presign final image URL:', presignError);
+    }
+
+    let uploadedImagePresignedUrl = uploadedImageUrl;
+    if (uploadedKey) {
+      try {
+        uploadedImagePresignedUrl = await S3Service.getPresignedUrl(uploadedKey, 3600);
+      } catch (presignError) {
+        console.warn('Failed to presign upload image URL:', presignError);
+      }
+    }
+
     // Save metadata to Supabase database
     let dbData, dbError;
     
@@ -365,9 +383,9 @@ export async function POST(request: NextRequest) {
       name: dbData.name,
       organization: dbData.organization,
       aws_key: dbData.aws_key,
-      photo_url: uploadedImageUrl,
-      generated_image_url: finalImagePath,
-      final_image_url: finalImagePath
+      photo_url: uploadedImagePresignedUrl,
+      generated_image_url: finalImagePresignedUrl,
+      final_image_url: finalImagePresignedUrl
     });
   } catch (error: any) {
     console.error('CRITICAL ERROR during generation:', error);

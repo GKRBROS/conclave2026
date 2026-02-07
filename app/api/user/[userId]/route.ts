@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase/admin';
+import { S3Service } from '@/lib/s3Service';
 
 export async function GET(
     request: Request,
@@ -51,10 +52,18 @@ export async function GET(
             );
         }
 
+        let finalImageUrl = data.generated_image_url;
+        try {
+            const finalKey = new URL(finalImageUrl).pathname.replace(/^\//, '');
+            finalImageUrl = await S3Service.getPresignedUrl(finalKey, 3600);
+        } catch (presignError) {
+            console.warn('Failed to presign final image URL:', presignError);
+        }
+
         // Return only the final image URL
         return NextResponse.json({
             success: true,
-            final_image_url: data.generated_image_url
+            final_image_url: finalImageUrl
         });
     } catch (error: any) {
         console.error('Error fetching user details:', error);
