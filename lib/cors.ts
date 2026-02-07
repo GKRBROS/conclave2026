@@ -7,6 +7,7 @@ export function corsHeaders(origin?: string) {
     'https://conclave2026.vercel.app',
     'https://scaleup-one.vercel.app',
     'https://scaleupconclave.com',
+    'http://13.127.247.90',
     'https://www.conclave2026.com',
   ];
 
