@@ -5,11 +5,13 @@ export function corsHeaders(origin?: string) {
     'http://localhost:3000',
     'http://localhost:3001',
     'https://conclave2026.vercel.app',
+    'https://scaleup-one.vercel.app',
+    'https://scaleupconclave.com',
     'https://www.conclave2026.com',
   ];
 
   const requestOrigin = origin || '';
-  const allowOrigin = allowedOrigins.includes(requestOrigin) ? requestOrigin : allowedOrigins[0];
+  const allowOrigin = requestOrigin || '*';
 
   return {
     'Access-Control-Allow-Origin': allowOrigin,
