@@ -47,7 +47,29 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Step 2: Check if already verified
+    // Step 2: Check if OTP expired
+    const now = new Date();
+    const expiresAt = new Date(verificationData.expires_at);
+
+    if (now > expiresAt) {
+      console.error('❌ OTP expired');
+      await supabaseAdmin
+        .from('verification')
+        .update({
+          verified: false,
+          verified_at: null,
+        })
+        .eq('phone_no', phone_no);
+      return NextResponse.json(
+        {
+          error: 'OTP has expired. Please request a new OTP.',
+          expired_at: verificationData.expires_at,
+        },
+        { status: 400 }
+      );
+    }
+
+    // Step 3: Check if already verified
     if (verificationData.verified) {
       console.log('⚠️ Phone number already verified - require new OTP');
       return NextResponse.json(
@@ -56,21 +78,6 @@ export async function POST(request: NextRequest) {
           verified_at: verificationData.verified_at,
         },
         { status: 409 }
-      );
-    }
-
-    // Step 3: Check if OTP expired
-    const now = new Date();
-    const expiresAt = new Date(verificationData.expires_at);
-
-    if (now > expiresAt) {
-      console.error('❌ OTP expired');
-      return NextResponse.json(
-        {
-          error: 'OTP has expired. Please request a new OTP.',
-          expired_at: verificationData.expires_at,
-        },
-        { status: 400 }
       );
     }
 

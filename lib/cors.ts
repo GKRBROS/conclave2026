@@ -9,6 +9,7 @@ export function corsHeaders(origin?: string) {
     'https://scaleupconclave.com',
     'http://13.127.247.90',
     'https://www.conclave2026.com',
+    'https://scaleup.frameforge.one/',
   ];
 
   const requestOrigin = origin || '';
