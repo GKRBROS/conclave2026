@@ -11,46 +11,46 @@ export async function POST(request: NextRequest) {
   const origin = request.headers.get('origin') || undefined;
   try {
     const body = await request.json();
-    const { phone_no } = body;
+    const { email } = body;
 
-    console.log('📞 Received OTP request:', { phone_no, bodyType: typeof phone_no });
+    console.log('📧 Received OTP request for email:', { email, bodyType: typeof email });
 
-    // Validate phone number
-    if (!phone_no || typeof phone_no !== 'string') {
-      console.error('❌ Phone number validation failed:', phone_no);
+    // Validate email
+    if (!email || typeof email !== 'string') {
+      console.error('❌ Email validation failed:', email);
       return NextResponse.json(
-        { error: 'Phone number is required' },
+        { error: 'Email is required' },
         { status: 400, headers: corsHeaders(origin) }
       );
     }
 
-    const phoneRegex = /^\+?[0-9]{10,15}$/;
-    if (!phoneRegex.test(phone_no)) {
-      console.error('❌ Phone regex validation failed:', phone_no);
+    const emailRegex = /^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$/;
+    if (!emailRegex.test(email)) {
+      console.error('❌ Email regex validation failed:', email);
       return NextResponse.json(
-        { error: 'Invalid phone number format. Must be 10-15 digits.' },
+        { error: 'Invalid email format' },
         { status: 400, headers: corsHeaders(origin) }
       );
     }
 
-    console.log('🔍 Checking if phone number exists in generations table...');
+    console.log('🔍 Checking if email exists in generations table...');
 
-    // Step 1: Check if phone number exists in generations table
+    // Step 1: Check if email exists in generations table
     const { data: generationData, error: genError } = await supabaseAdmin
       .from('generations')
-      .select('id, phone_no, name')
-      .eq('phone_no', phone_no)
+      .select('id, email, name')
+      .eq('email', email)
       .single();
 
     if (genError || !generationData) {
-      console.error('Phone number not found in generations:', genError);
+      console.error('Email not found in generations:', genError);
       return NextResponse.json(
-        { error: 'Phone number not registered. Please generate an avatar first.' },
+        { error: 'Email not registered. Please generate an avatar first.' },
         { status: 404, headers: corsHeaders(origin) }
       );
     }
 
-    console.log('✅ Phone number found:', generationData.phone_no);
+    console.log('✅ Email found:', generationData.email);
 
     // Step 2: Generate new OTP
     const otp = generateOTP();
@@ -59,11 +59,11 @@ export async function POST(request: NextRequest) {
     console.log('🔐 Generated OTP:', otp);
     console.log('⏰ Expires at:', expiresAt.toISOString());
 
-    // Step 3: Check if OTP already exists for this phone number
+    // Step 3: Check if OTP already exists for this email
     const { data: existingOTP } = await supabaseAdmin
       .from('verification')
-      .select('id, phone_no')
-      .eq('phone_no', phone_no)
+      .select('id, email')
+      .eq('email', email)
       .single();
 
     let verificationData;
@@ -81,7 +81,7 @@ export async function POST(request: NextRequest) {
           attempts: 0,
           created_at: new Date().toISOString(),
         })
-        .eq('phone_no', phone_no)
+        .eq('email', email)
         .select()
         .single();
 
@@ -100,7 +100,7 @@ export async function POST(request: NextRequest) {
       const { data, error: insertError } = await supabaseAdmin
         .from('verification')
         .insert({
-          phone_no: phone_no,
+          email: email,
           otp: otp,
           generation_id: generationData.id,
           expires_at: expiresAt.toISOString(),
@@ -121,31 +121,14 @@ export async function POST(request: NextRequest) {
       verificationData = data;
     }
 
-    // Step 4: Send OTP via SMS
-    console.log('📤 Sending OTP via SMS...');
-    
-    // Format phone number
-    let formattedPhone = phone_no;
-    if (!phone_no.startsWith('+')) {
-      formattedPhone = `+91${phone_no}`;
-    }
-
-    const smsResult = await OtpService.sendOtp(formattedPhone, otp);
-
-    if (!smsResult.success) {
-      console.warn('⚠️ SMS sending failed:', smsResult.message);
-      // Don't fail the request, OTP is still stored
-    }
-
-    console.log('✅ OTP generated and sent successfully');
+    console.log('✅ OTP generated successfully. Returning to frontend for SMTP sending.');
 
     return NextResponse.json({
       success: true,
-      message: 'OTP sent successfully',
-      phone_no: phone_no,
+      message: 'OTP generated successfully',
+      email: email,
+      otp: otp, // Return OTP so frontend can send via SMTP
       expires_in_minutes: 10,
-      // Only include OTP in response for development/testing
-      ...(process.env.NODE_ENV !== 'production' && { otp: otp }),
     }, {
       headers: corsHeaders(origin),
     });

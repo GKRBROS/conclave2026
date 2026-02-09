@@ -68,6 +68,8 @@ export async function POST(request: NextRequest) {
         const trimmedPhone = phone_no.trim();
         const trimmedEmail = email.trim();
 
+        console.log(`🔍 Registering user with email: ${trimmedEmail} and phone: ${trimmedPhone}`);
+
         const { data: existingUser, error: existingError } = await supabaseAdmin
             .from('generations')
             .select('id, name, organization')

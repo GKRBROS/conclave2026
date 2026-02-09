@@ -12,12 +12,12 @@ export async function POST(request: NextRequest) {
   const origin = request.headers.get('origin') || undefined;
   try {
     const body = await request.json();
-    const { phone_no, otp } = body;
+    const { email, otp } = body;
 
     // Validate inputs
-    if (!phone_no || typeof phone_no !== 'string') {
+    if (!email || typeof email !== 'string') {
       return NextResponse.json(
-        { error: 'Phone number is required' },
+        { error: 'Email is required' },
         { status: 400, headers: corsHeaders(origin) }
       );
     }
@@ -36,19 +36,19 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    console.log('🔍 Verifying OTP for phone:', phone_no);
+    console.log('🔍 Verifying OTP for email:', email);
 
     // Step 1: Get verification record
     const { data: verificationData, error: fetchError } = await supabaseAdmin
       .from('verification')
       .select('*')
-      .eq('phone_no', phone_no)
+      .eq('email', email)
       .single();
 
     if (fetchError || !verificationData) {
       console.error('Verification record not found:', fetchError);
       return NextResponse.json(
-        { error: 'No OTP found for this phone number. Please request a new OTP.' },
+        { error: 'No OTP found for this email address. Please request a new OTP.' },
         { status: 404, headers: corsHeaders(origin) }
       );
     }
@@ -65,7 +65,7 @@ export async function POST(request: NextRequest) {
           verified: false,
           verified_at: null,
         })
-        .eq('phone_no', phone_no);
+        .eq('email', email);
       return NextResponse.json(
         {
           error: 'OTP has expired. Please request a new OTP.',
@@ -84,7 +84,7 @@ export async function POST(request: NextRequest) {
           verified: false,
           verified_at: null,
         })
-        .eq('phone_no', phone_no);
+        .eq('email', email);
       return NextResponse.json(
         {
           error: 'Phone number already verified. Please request a new OTP to verify again.',
@@ -113,7 +113,7 @@ export async function POST(request: NextRequest) {
       await supabaseAdmin
         .from('verification')
         .update({ attempts: newAttempts })
-        .eq('phone_no', phone_no);
+        .eq('email', email);
 
       console.error(`❌ Invalid OTP (attempt ${newAttempts}/${MAX_ATTEMPTS})`);
       return NextResponse.json(
@@ -134,7 +134,7 @@ export async function POST(request: NextRequest) {
         verified: true,
         verified_at: new Date().toISOString(),
       })
-      .eq('phone_no', phone_no)
+      .eq('email', email)
       .select()
       .single();
 
@@ -150,7 +150,7 @@ export async function POST(request: NextRequest) {
     const { data: userData, error: userError } = await supabaseAdmin
       .from('generations')
       .select('id, name, email, phone_no, generated_image_url')
-      .eq('phone_no', phone_no)
+      .eq('email', email)
       .single();
 
     if (userError) {
@@ -159,7 +159,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      message: 'Phone number verified successfully',
+      message: 'Email verified successfully',
       verified_at: updatedData.verified_at,
       user: userData || null,
     }, {

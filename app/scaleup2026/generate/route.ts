@@ -7,6 +7,7 @@ import { S3Service } from '@/lib/s3Service';
 import { corsHeaders, handleCorsOptions } from '@/lib/cors';
 import OpenAI from 'openai';
 import sharp from 'sharp';
+import { WhatsappService } from '@/lib/whatsappService';
 
 export const maxDuration = 600; // Increase timeout for long AI generation
 
@@ -384,6 +385,23 @@ export async function POST(request: NextRequest) {
     }
 
     console.log('Saved to database:', dbData);
+
+    // Step 8: Send WhatsApp message (Non-blocking)
+    if (phone_no) {
+      console.log('📱 Triggering WhatsApp message...');
+      // We use the public URL for WhatsApp
+      const whatsappImageUrl = finalImagePresignedUrl || finalImagePath;
+
+      WhatsappService.sendImage(phone_no, whatsappImageUrl).then(res => {
+        if (res.success) {
+          console.log('✅ WhatsApp notification sent successfully');
+        } else {
+          console.warn('⚠️ WhatsApp notification failed:', res.message);
+        }
+      }).catch(err => {
+        console.error('❌ Error in WhatsApp notification promise:', err);
+      });
+    }
 
     return NextResponse.json({
       success: true,
