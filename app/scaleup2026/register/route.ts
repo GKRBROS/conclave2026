@@ -21,7 +21,10 @@ export async function POST(request: NextRequest) {
     const origin = request.headers.get('origin') || undefined;
     try {
         const body = await request.json();
-        const { name, email, phone_no, district, category, organization } = body;
+        const { name, email, phone, phone_no, district, category, organization, did_you_attend_the_previous_scaleup_conclave_ } = body;
+
+        // Handle both 'phone' (MakeMuPass) and 'phone_no' (Internal)
+        const finalPhone = phone || phone_no;
 
         if (!name || typeof name !== 'string' || name.trim().length === 0) {
             return NextResponse.json(
@@ -37,7 +40,7 @@ export async function POST(request: NextRequest) {
             );
         }
 
-        if (!phone_no || typeof phone_no !== 'string' || !PHONE_REGEX.test(phone_no)) {
+        if (!finalPhone || typeof finalPhone !== 'string' || !PHONE_REGEX.test(finalPhone)) {
             return NextResponse.json(
                 { error: 'Valid phone number is required (10-15 digits)' },
                 { status: 400, headers: corsHeaders(origin) }
@@ -65,7 +68,7 @@ export async function POST(request: NextRequest) {
             );
         }
 
-        const trimmedPhone = phone_no.trim();
+        const trimmedPhone = finalPhone.trim();
         const trimmedEmail = email.trim();
 
         console.log(`🔍 Registering user with email: ${trimmedEmail} and phone: ${trimmedPhone}`);

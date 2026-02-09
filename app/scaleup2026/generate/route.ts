@@ -44,7 +44,9 @@ export async function POST(request: NextRequest) {
     const image = formData.get('photo') as File;
     const name = formData.get('name') as string;
     const email = formData.get('email') as string | null;
-    const phone_no = formData.get('phone_no') as string | null;
+    const phone = formData.get('phone') as string | null;
+    const phone_no_val = formData.get('phone_no') as string | null;
+    const finalPhone = phone || phone_no_val;
     const district = formData.get('district') as string | null;
     const category = formData.get('category') as string | null;
     const organization = formData.get('organization') as string;
@@ -278,7 +280,7 @@ export async function POST(request: NextRequest) {
     let finalImagePresignedUrl = finalImagePath;
     try {
       const finalKey = new URL(finalImagePath).pathname.replace(/^\//, '');
-      finalImagePresignedUrl = await S3Service.getPresignedUrl(finalKey, 3600);
+      finalImagePresignedUrl = await S3Service.getPresignedUrl(finalKey, 604800); // 7 days expiry
     } catch (presignError) {
       console.warn('Failed to presign final image URL:', presignError);
     }
@@ -295,15 +297,15 @@ export async function POST(request: NextRequest) {
     // Save metadata to Supabase database
     let dbData, dbError;
 
-    // If phone_no is provided, try to update existing user
-    if (phone_no && phone_no.trim().length > 0) {
-      console.log(`📱 Searching for existing user with phone: ${phone_no}`);
+    // If phone number is provided, try to update existing user
+    if (finalPhone && finalPhone.trim().length > 0) {
+      console.log(`📱 Searching for existing user with phone: ${finalPhone}`);
 
       // Check if user exists
       const { data: existingUser, error: searchError } = await supabase
         .from('generations')
         .select('*')
-        .eq('phone_no', phone_no.trim())
+        .eq('phone_no', finalPhone.trim())
         .single();
 
       if (!searchError && existingUser) {
@@ -320,7 +322,7 @@ export async function POST(request: NextRequest) {
             prompt_type: prompt_type,
             updated_at: new Date().toISOString()
           })
-          .eq('phone_no', phone_no.trim())
+          .eq('phone_no', finalPhone.trim())
           .select()
           .single();
 
@@ -334,7 +336,7 @@ export async function POST(request: NextRequest) {
           .insert({
             name: name.trim(),
             email: email ? email.trim() : null,
-            phone_no: phone_no.trim(),
+            phone_no: finalPhone.trim(),
             district: district ? district.trim() : null,
             category: category ? category.trim() : null,
             organization: organization.trim(),
@@ -387,18 +389,21 @@ export async function POST(request: NextRequest) {
     console.log('Saved to database:', dbData);
 
     // Step 8: Send WhatsApp message (Non-blocking)
-    if (phone_no) {
-      console.log(`📱 Triggering WhatsApp message to ${phone_no}...`);
-      // Use the pre-signed URL for WhatsApp to ensure it's viewable/downloadable (not an XML error)
-      const whatsappImageUrl = finalImagePresignedUrl;
+    if (finalPhone) {
+      console.log('📱 Triggering WhatsApp message...');
+      // We use the public URL for WhatsApp
+      // If we have a presigned URL, that might be better if the bucket is private
+      // But the user said "downloaded and viewable image url", and usually WhatsApp api likes direct links.
+      // S3Service.getPublicUrl returns the direct path.
 
-      console.log('🔗 WhatsApp Image URL:', whatsappImageUrl);
+      // Let's ensure we use a URL that is accessible.
+      const whatsappImageUrl = finalImagePresignedUrl || finalImagePath;
 
-      WhatsappService.sendImage(phone_no, whatsappImageUrl).then(res => {
+      WhatsappService.sendImage(finalPhone, whatsappImageUrl).then(res => {
         if (res.success) {
           console.log('✅ WhatsApp notification sent successfully');
         } else {
-          console.warn('⚠️ WhatsApp notification failed:', res.message, res.error);
+          console.warn('⚠️ WhatsApp notification failed:', res.message);
         }
       }).catch(err => {
         console.error('❌ Error in WhatsApp notification promise:', err);

@@ -77,7 +77,7 @@ export async function POST(request: NextRequest) {
 
     // Step 3: Check if already verified
     if (verificationData.verified) {
-      console.log('⚠️ Phone number already verified - require new OTP');
+      console.log('⚠️ Email address already verified - require new OTP');
       await supabaseAdmin
         .from('verification')
         .update({
@@ -87,7 +87,7 @@ export async function POST(request: NextRequest) {
         .eq('email', email);
       return NextResponse.json(
         {
-          error: 'Phone number already verified. Please request a new OTP to verify again.',
+          error: 'Email address already verified. Please request a new OTP to verify again.',
           verified_at: verificationData.verified_at,
         },
         { status: 409, headers: corsHeaders(origin) }
@@ -161,6 +161,7 @@ export async function POST(request: NextRequest) {
       success: true,
       message: 'Email verified successfully',
       verified_at: updatedData.verified_at,
+      user_id: userData?.id || null,
       user: userData || null,
     }, {
       headers: corsHeaders(origin),

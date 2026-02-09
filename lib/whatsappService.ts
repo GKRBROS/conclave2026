@@ -20,6 +20,7 @@ export class WhatsappService {
       const formattedPhone = phoneNumber.replace(/\+/g, '').replace(/\D/g, '');
 
       console.log(`📤 Sending WhatsApp image to ${formattedPhone}...`);
+      console.log(`🔗 Image URL: ${imageUrl}`);
 
       const response = await axios.post(
         this.API_URL,
