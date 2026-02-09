@@ -9,7 +9,7 @@ export class WhatsappService {
    * @param phoneNumber The recipient's phone number. Should be numeric string.
    * @param imageUrl The URL of the image to send.
    */
-  static async sendImage(phoneNumber: string, imageUrl: string): Promise<{ success: boolean; message: string; data?: any }> {
+  static async sendImage(phoneNumber: string, imageUrl: string): Promise<{ success: boolean; message: string; data?: any; error?: any }> {
     try {
       if (!this.API_KEY) {
         console.error('❌ MAKEMYPASS_API_KEY is not configured');

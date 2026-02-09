@@ -388,15 +388,17 @@ export async function POST(request: NextRequest) {
 
     // Step 8: Send WhatsApp message (Non-blocking)
     if (phone_no) {
-      console.log('📱 Triggering WhatsApp message...');
-      // We use the public URL for WhatsApp
-      const whatsappImageUrl = finalImagePresignedUrl || finalImagePath;
+      console.log(`📱 Triggering WhatsApp message to ${phone_no}...`);
+      // Use the pre-signed URL for WhatsApp to ensure it's viewable/downloadable (not an XML error)
+      const whatsappImageUrl = finalImagePresignedUrl;
+
+      console.log('🔗 WhatsApp Image URL:', whatsappImageUrl);
 
       WhatsappService.sendImage(phone_no, whatsappImageUrl).then(res => {
         if (res.success) {
           console.log('✅ WhatsApp notification sent successfully');
         } else {
-          console.warn('⚠️ WhatsApp notification failed:', res.message);
+          console.warn('⚠️ WhatsApp notification failed:', res.message, res.error);
         }
       }).catch(err => {
         console.error('❌ Error in WhatsApp notification promise:', err);
