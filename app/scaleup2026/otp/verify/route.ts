@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase/admin';
 import { corsHeaders, handleCorsOptions } from '@/lib/cors';
+import { S3Service } from '@/lib/s3Service';
 
 const MAX_ATTEMPTS = 5; // Maximum OTP verification attempts
 
@@ -159,15 +160,34 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Step 7: Get user details from generations table
+    // Step 7: Get user details from generations table (fetch latest generation)
     const { data: userData, error: userError } = await supabaseAdmin
       .from('generations')
-      .select('id, name, email, phone_no, generated_image_url')
+      .select('id, name, email, phone_no, generated_image_url, created_at')
       .eq('email', email)
-      .single();
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
 
     if (userError) {
       console.warn('Could not fetch user data:', userError);
+    }
+
+    // Step 8: Generate signed URL for the image if it exists
+    let signedImageUrl = null;
+    if (userData?.generated_image_url) {
+      try {
+        // Check if it's already a full URL (e.g. from OpenRouter fallback)
+        if (userData.generated_image_url.startsWith('http')) {
+             signedImageUrl = userData.generated_image_url;
+        } else {
+             // It's an S3 key, generate presigned URL
+             signedImageUrl = await S3Service.getPresignedUrl(userData.generated_image_url);
+        }
+        console.log('✅ Generated signed URL for image');
+      } catch (err) {
+        console.error('❌ Failed to sign S3 URL:', err);
+      }
     }
 
     return NextResponse.json({
@@ -175,7 +195,11 @@ export async function POST(request: NextRequest) {
       message: 'Email verified successfully',
       verified_at: updatedData.verified_at,
       user_id: userData?.id || null,
-      user: userData || null,
+      user: {
+        ...userData,
+        signed_image_url: signedImageUrl
+      },
+      image_url: signedImageUrl, // Top-level for convenience
     }, {
       headers: corsHeaders(origin),
     });
