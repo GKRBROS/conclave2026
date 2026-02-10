@@ -24,26 +24,39 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    const trimmedEmail = email.trim().toLowerCase();
     const emailRegex = /^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$/;
-    if (!emailRegex.test(email)) {
-      console.error('❌ Email regex validation failed:', email);
+    if (!emailRegex.test(trimmedEmail)) {
+      console.error('❌ Email regex validation failed:', trimmedEmail);
       return NextResponse.json(
         { error: 'Invalid email format' },
         { status: 400, headers: corsHeaders(origin) }
       );
     }
 
-    console.log('🔍 Checking if email exists in generations table...');
+    console.log('🔍 Checking if email exists in generations table (using ilike)...');
+    console.log(`   Searching for: "${trimmedEmail}"`);
 
     // Step 1: Check if email exists in generations table
+    // Use ilike for case-insensitive match
     const { data: generationData, error: genError } = await supabaseAdmin
       .from('generations')
       .select('id, email, name')
-      .eq('email', email)
-      .single();
+      .ilike('email', trimmedEmail)
+      .maybeSingle(); // Use maybeSingle to avoid error on no rows, but we want single row
 
-    if (genError || !generationData) {
-      console.error('Email not found in generations:', genError);
+    if (genError) {
+       console.error('Database error checking email:', genError);
+       return NextResponse.json(
+        { error: 'Database error. Please try again.' },
+        { status: 500, headers: corsHeaders(origin) }
+      );
+    }
+
+    if (!generationData) {
+      console.warn(`⚠️ Email not found in generations table: "${trimmedEmail}"`);
+      // Optional: Check if it exists with whitespace in DB?
+      // For now, return 404
       return NextResponse.json(
         { error: 'Email not registered. Please generate an avatar first.' },
         { status: 404, headers: corsHeaders(origin) }
@@ -60,10 +73,13 @@ export async function POST(request: NextRequest) {
     console.log('⏰ Expires at:', expiresAt.toISOString());
 
     // Step 3: Check if OTP already exists for this email
+    // Use the exact email found in the database to be safe, or the trimmed input
+    const targetEmail = generationData.email; 
+
     const { data: existingOTP } = await supabaseAdmin
       .from('verification')
       .select('id, email')
-      .eq('email', email)
+      .eq('email', targetEmail)
       .single();
 
     let verificationData;
@@ -81,7 +97,7 @@ export async function POST(request: NextRequest) {
           attempts: 0,
           created_at: new Date().toISOString(),
         })
-        .eq('email', email)
+        .eq('email', targetEmail)
         .select()
         .single();
 
@@ -100,7 +116,7 @@ export async function POST(request: NextRequest) {
       const { data, error: insertError } = await supabaseAdmin
         .from('verification')
         .insert({
-          email: email,
+          email: targetEmail,
           otp: otp,
           generation_id: generationData.id,
           expires_at: expiresAt.toISOString(),
@@ -126,7 +142,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       success: true,
       message: 'OTP generated successfully',
-      email: email,
+      email: targetEmail,
       otp: otp, // Return OTP so frontend can send via SMTP
       expires_in_minutes: 10,
     }, {

@@ -36,22 +36,35 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    console.log('🔍 Verifying OTP for email:', email);
+    const trimmedEmail = email.trim().toLowerCase();
+    console.log('🔍 Verifying OTP for email:', trimmedEmail);
 
     // Step 1: Get verification record
+    // Use ilike for email lookup to ensure case-insensitivity
     const { data: verificationData, error: fetchError } = await supabaseAdmin
       .from('verification')
       .select('*')
-      .eq('email', email)
-      .single();
+      .ilike('email', trimmedEmail)
+      .maybeSingle();
 
-    if (fetchError || !verificationData) {
-      console.error('Verification record not found:', fetchError);
+    if (fetchError) {
+       console.error('Database error fetching verification:', fetchError);
+       return NextResponse.json(
+        { error: 'Database error. Please try again.' },
+        { status: 500, headers: corsHeaders(origin) }
+      );
+    }
+
+    if (!verificationData) {
+      console.warn(`Verification record not found for: "${trimmedEmail}"`);
       return NextResponse.json(
         { error: 'No OTP found for this email address. Please request a new OTP.' },
         { status: 404, headers: corsHeaders(origin) }
       );
     }
+    
+    // Use the actual email from the record for updates
+    const targetEmail = verificationData.email;
 
     // Step 2: Check if OTP expired
     const now = new Date();
