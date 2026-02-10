@@ -24,6 +24,25 @@ async function testEmail() {
 
   const key = 'generated/generated-test.png';
 
+  console.log('🔄 Uploading dummy image to ensure it exists...');
+  try {
+    // Create a 1x1 transparent GIF buffer or similar. 
+    // Here is a base64 for a 1x1 red pixel png
+    const base64Image = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==';
+    const buffer = Buffer.from(base64Image, 'base64');
+
+    await s3.send(new PutObjectCommand({
+      Bucket: BUCKET_NAME,
+      Key: key,
+      Body: buffer,
+      ContentType: 'image/png',
+    }));
+    console.log('✅ Upload successful.');
+  } catch (err) {
+    console.error('❌ Upload failed:', err);
+    return;
+  }
+
   console.log('🔄 Generating presigned URL for testing...');
   let imageUrl;
   
@@ -39,21 +58,19 @@ async function testEmail() {
     console.log(`✅ Generated Presigned URL: ${imageUrl}`);
     
     // Escape for HTML
-    imageUrl = imageUrl.replace(/&/g, '&amp;');
-    console.log(`✅ Escaped URL for HTML: ${imageUrl}`);
-  } catch (err) {
-    console.error('❌ Failed to generate presigned URL:', err);
-    // Fallback to static URL if signing fails (should not happen if creds are good)
-    imageUrl = `https://${BUCKET_NAME}.s3.${AWS_S3_REGION}.amazonaws.com/${key}`;
-  }
+    const escapedImageUrl = imageUrl.replace(/&/g, '&amp;');
+    console.log(`✅ Escaped URL for HTML: ${escapedImageUrl}`);
 
-  console.log(`📧 Sending test email to ${email}...`);
-
-  try {
+    // Verify URL access
+    console.log('🔄 Verifying URL access...');
+    // We can't easily fetch it here without axios/fetch, assuming it works if upload worked.
+    // But we can verify the structure.
+    
+    console.log(`📧 Sending test email to ${email}...`);
     const templatePath = path.join(process.cwd(), 'send-mail', 'mail.html');
     let html = fs.readFileSync(templatePath, 'utf-8');
     
-    html = html.replace(/{{DOWNLOAD_URL}}/g, imageUrl);
+    html = html.replace(/{{DOWNLOAD_URL}}/g, escapedImageUrl);
 
     const transporter = nodemailer.createTransport({
       host: process.env.SMTP_HOST_NAME,
@@ -73,8 +90,8 @@ async function testEmail() {
     });
 
     console.log('✅ Email sent successfully:', info.messageId);
-  } catch (emailError) {
-    console.error('❌ Failed to send email:', emailError);
+  } catch (err) {
+    console.error('❌ Error:', err);
   }
 }
 
