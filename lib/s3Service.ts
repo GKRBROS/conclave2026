@@ -47,6 +47,7 @@ export class S3Service {
         Key: fileKey,
         Body: buffer,
         ContentType: contentType,
+        // ACL: 'public-read', // Bucket does not allow ACLs
       },
     });
 
@@ -83,6 +84,7 @@ export class S3Service {
         Key: fileKey,
         Body: fileStream,
         ContentType: contentType,
+        // ACL: 'public-read', // Bucket does not allow ACLs
       },
     });
 

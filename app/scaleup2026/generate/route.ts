@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { writeFile, mkdir } from 'fs/promises';
+import { writeFile, mkdir, readFile } from 'fs/promises';
 import { join } from 'path';
+import nodemailer from 'nodemailer';
 import { mergeImages } from '@/lib/imageProcessor';
 import { supabaseAdmin } from '@/lib/supabase/admin';
 import { S3Service } from '@/lib/s3Service';
@@ -443,6 +444,46 @@ export async function POST(request: NextRequest) {
       }).catch(err => {
         console.error('❌ Error in WhatsApp notification promise:', err);
       });
+    }
+
+    // Step 9: Send Email (Non-blocking)
+    if (email && email.trim().length > 0) {
+      console.log(`📧 Sending email to ${email}...`);
+      
+      // Use the presigned URL for the email to ensure it is viewable/downloadable
+      // This solves the issue where public URLs might be blocked by bucket policies
+      // We MUST escape the ampersands for HTML context to avoid breaking the link in some clients
+      const emailImageUrl = finalImagePresignedUrl.replace(/&/g, '&amp;');
+
+      // We run this async without awaiting to not block the response
+      (async () => {
+        try {
+          const templatePath = join(process.cwd(), 'send-mail', 'mail.html');
+          let html = await readFile(templatePath, 'utf-8');
+          
+          html = html.replace(/{{DOWNLOAD_URL}}/g, emailImageUrl);
+
+          const transporter = nodemailer.createTransport({
+            host: process.env.SMTP_HOST_NAME,
+            port: Number(process.env.SMTP_PORT),
+            secure: Number(process.env.SMTP_PORT) === 465,
+            auth: {
+              user: process.env.SMTP_USER,
+              pass: process.env.SMTP_PASS,
+            },
+          });
+
+          await transporter.sendMail({
+            from: `"ScaleUp" <${process.env.SMTP_USER}>`,
+            to: email,
+            subject: 'ScaleUp Generated Avatar',
+            html,
+          });
+          console.log('✅ Email sent successfully');
+        } catch (emailError) {
+          console.error('❌ Failed to send email:', emailError);
+        }
+      })();
     }
 
     return NextResponse.json({
