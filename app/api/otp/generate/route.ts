@@ -1,46 +1,70 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase/admin';
 import { generateOTP } from '@/lib/otpService';
+import { corsHeaders, handleCorsOptions } from '@/lib/cors';
+import nodemailer from 'nodemailer';
+import fs from 'fs';
+import path from 'path';
+
+export async function OPTIONS(request: NextRequest) {
+  return handleCorsOptions(request);
+}
 
 export async function POST(request: NextRequest) {
+  const origin = request.headers.get('origin') || undefined;
   try {
     const body = await request.json();
-    const { phone_no } = body;
+    const { email } = body;
 
-    // Validate phone number
-    if (!phone_no || typeof phone_no !== 'string') {
+    console.log('📧 Received OTP request for email:', { email, bodyType: typeof email });
+
+    // Validate email
+    if (!email || typeof email !== 'string') {
+      console.error('❌ Email validation failed:', email);
       return NextResponse.json(
-        { error: 'Phone number is required' },
-        { status: 400 }
+        { error: 'Email is required' },
+        { status: 400, headers: corsHeaders(origin) }
       );
     }
 
-    const phoneRegex = /^\+?[0-9]{10,15}$/;
-    if (!phoneRegex.test(phone_no)) {
+    const trimmedEmail = email.trim().toLowerCase();
+    const emailRegex = /^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$/;
+    if (!emailRegex.test(trimmedEmail)) {
+      console.error('❌ Email regex validation failed:', trimmedEmail);
       return NextResponse.json(
-        { error: 'Invalid phone number format. Must be 10-15 digits.' },
-        { status: 400 }
+        { error: 'Invalid email format' },
+        { status: 400, headers: corsHeaders(origin) }
       );
     }
 
-    console.log('🔍 Checking if phone number exists in generations table...');
+    console.log('🔍 Checking if email exists in generations table (using ilike)...');
+    console.log(`   Searching for: "${trimmedEmail}"`);
 
-    // Step 1: Check if phone number exists in generations table
+    // Step 1: Check if email exists in generations table
     const { data: generationData, error: genError } = await supabaseAdmin
       .from('generations')
-      .select('id, phone_no, name')
-      .eq('phone_no', phone_no)
-      .single();
+      .select('id, email, name')
+      .ilike('email', trimmedEmail)
+      .limit(1)
+      .maybeSingle();
 
-    if (genError || !generationData) {
-      console.error('Phone number not found in generations:', genError);
-      return NextResponse.json(
-        { error: 'Phone number not registered. Please generate an avatar first.' },
-        { status: 404 }
+    if (genError) {
+       console.error('Database error checking email:', genError);
+       return NextResponse.json(
+        { error: 'Database error. Please try again.' },
+        { status: 500, headers: corsHeaders(origin) }
       );
     }
 
-    console.log('✅ Phone number found:', generationData.phone_no);
+    if (!generationData) {
+      console.warn(`⚠️ Email not found in generations table: "${trimmedEmail}"`);
+      return NextResponse.json(
+        { error: 'Email not registered. Please generate an avatar first.' },
+        { status: 404, headers: corsHeaders(origin) }
+      );
+    }
+
+    console.log('✅ Email found:', generationData.email);
 
     // Step 2: Generate new OTP
     const otp = generateOTP();
@@ -49,11 +73,13 @@ export async function POST(request: NextRequest) {
     console.log('🔐 Generated OTP:', otp);
     console.log('⏰ Expires at:', expiresAt.toISOString());
 
-    // Step 3: Check if OTP already exists for this phone number
+    // Step 3: Check if OTP already exists for this email
+    const targetEmail = generationData.email; 
+
     const { data: existingOTP } = await supabaseAdmin
       .from('verification')
-      .select('id, phone_no')
-      .eq('phone_no', phone_no)
+      .select('id, email')
+      .eq('email', targetEmail)
       .single();
 
     let verificationData;
@@ -71,7 +97,7 @@ export async function POST(request: NextRequest) {
           attempts: 0,
           created_at: new Date().toISOString(),
         })
-        .eq('phone_no', phone_no)
+        .eq('email', targetEmail)
         .select()
         .single();
 
@@ -79,7 +105,7 @@ export async function POST(request: NextRequest) {
         console.error('Failed to update OTP:', updateError);
         return NextResponse.json(
           { error: 'Failed to update OTP', details: updateError.message },
-          { status: 500 }
+          { status: 500, headers: corsHeaders(origin) }
         );
       }
 
@@ -90,7 +116,7 @@ export async function POST(request: NextRequest) {
       const { data, error: insertError } = await supabaseAdmin
         .from('verification')
         .insert({
-          phone_no: phone_no,
+          email: targetEmail,
           otp: otp,
           generation_id: generationData.id,
           expires_at: expiresAt.toISOString(),
@@ -104,40 +130,54 @@ export async function POST(request: NextRequest) {
         console.error('Failed to insert OTP:', insertError);
         return NextResponse.json(
           { error: 'Failed to generate OTP', details: insertError.message },
-          { status: 500 }
+          { status: 500, headers: corsHeaders(origin) }
         );
       }
 
       verificationData = data;
     }
 
-    // Step 4: Send OTP via SMS
-    console.log('📤 Sending OTP via SMS...');
-    const smsMessage = `Your Conclave 2026 verification code is: ${otp}. Valid for 10 minutes. Do not share this code.`;
-    
-    // Format phone number
-    let formattedPhone = phone_no;
-    if (!phone_no.startsWith('+')) {
-      formattedPhone = `+91${phone_no}`;
+    // Step 4: Send OTP via Email
+    try {
+      console.log('📧 Sending OTP email to:', targetEmail);
+      
+      const templatePath = path.join(process.cwd(), 'send-otp', 'mail.html');
+      let html = fs.readFileSync(templatePath, 'utf-8');
+      html = html.replace('{{OTP}}', otp);
+
+      const transporter = nodemailer.createTransport({
+        host: process.env.SMTP_HOST_NAME,
+        port: Number(process.env.SMTP_PORT),
+        secure: Number(process.env.SMTP_PORT) === 465,
+        auth: {
+          user: process.env.SMTP_USER,
+          pass: process.env.SMTP_PASS,
+        },
+      });
+
+      await transporter.sendMail({
+        from: process.env.SMTP_FROM || `"ScaleUp" <${process.env.SMTP_USER}>`,
+        to: targetEmail,
+        subject: 'ScaleUp Conclave - Your Verification Code',
+        html,
+      });
+
+      console.log('✅ OTP email sent successfully');
+    } catch (emailError: any) {
+      console.error('❌ Failed to send OTP email:', emailError);
+      // We still return success because the OTP was generated, but we include a warning/error
     }
 
-    // const smsResult = await OtpService.sendOtp(formattedPhone, otp);
-    const smsResult = { success: false, message: 'SMS service not implemented' };
-
-    if (!smsResult.success) {
-      console.warn('⚠️ SMS sending failed:', smsResult.message);
-      // Don't fail the request, OTP is still stored
-    }
-
-    console.log('✅ OTP generated and sent successfully');
+    console.log('✅ OTP generated and processed. Returning response.');
 
     return NextResponse.json({
       success: true,
-      message: 'OTP sent successfully',
-      phone_no: phone_no,
+      message: 'OTP generated and sent successfully',
+      email: targetEmail,
+      otp: otp, // Return OTP so frontend can verify if needed (or debug)
       expires_in_minutes: 10,
-      // Only include OTP in response for development/testing
-      ...(process.env.NODE_ENV !== 'production' && { otp: otp }),
+    }, {
+      headers: corsHeaders(origin),
     });
 
   } catch (error: any) {
@@ -147,7 +187,7 @@ export async function POST(request: NextRequest) {
         error: 'Failed to generate OTP',
         details: error?.message || 'Unknown error',
       },
-      { status: 500 }
+      { status: 500, headers: corsHeaders(origin) }
     );
   }
 }

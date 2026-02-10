@@ -1,51 +1,71 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase/admin';
+import { corsHeaders, handleCorsOptions } from '@/lib/cors';
+import { S3Service } from '@/lib/s3Service';
 
 const MAX_ATTEMPTS = 5; // Maximum OTP verification attempts
 
+export async function OPTIONS(request: NextRequest) {
+  return handleCorsOptions(request);
+}
+
 export async function POST(request: NextRequest) {
+  const origin = request.headers.get('origin') || undefined;
   try {
     const body = await request.json();
-    const { phone_no, otp } = body;
+    const { email, otp } = body;
 
     // Validate inputs
-    if (!phone_no || typeof phone_no !== 'string') {
+    if (!email || typeof email !== 'string') {
       return NextResponse.json(
-        { error: 'Phone number is required' },
-        { status: 400 }
+        { error: 'Email is required' },
+        { status: 400, headers: corsHeaders(origin) }
       );
     }
 
     if (!otp || typeof otp !== 'string') {
       return NextResponse.json(
         { error: 'OTP is required' },
-        { status: 400 }
+        { status: 400, headers: corsHeaders(origin) }
       );
     }
 
     if (otp.length !== 6 || !/^\d{6}$/.test(otp)) {
       return NextResponse.json(
         { error: 'Invalid OTP format. Must be 6 digits.' },
-        { status: 400 }
+        { status: 400, headers: corsHeaders(origin) }
       );
     }
 
-    console.log('🔍 Verifying OTP for phone:', phone_no);
+    const trimmedEmail = email.trim().toLowerCase();
+    console.log('🔍 Verifying OTP for email:', trimmedEmail);
 
     // Step 1: Get verification record
+    // Use ilike for email lookup to ensure case-insensitivity
     const { data: verificationData, error: fetchError } = await supabaseAdmin
       .from('verification')
       .select('*')
-      .eq('phone_no', phone_no)
-      .single();
+      .ilike('email', trimmedEmail)
+      .maybeSingle();
 
-    if (fetchError || !verificationData) {
-      console.error('Verification record not found:', fetchError);
-      return NextResponse.json(
-        { error: 'No OTP found for this phone number. Please request a new OTP.' },
-        { status: 404 }
+    if (fetchError) {
+       console.error('Database error fetching verification:', fetchError);
+       return NextResponse.json(
+        { error: 'Database error. Please try again.' },
+        { status: 500, headers: corsHeaders(origin) }
       );
     }
+
+    if (!verificationData) {
+      console.warn(`Verification record not found for: "${trimmedEmail}"`);
+      return NextResponse.json(
+        { error: 'No OTP found for this email address. Please request a new OTP.' },
+        { status: 404, headers: corsHeaders(origin) }
+      );
+    }
+    
+    // Use the actual email from the record for updates
+    const targetEmail = verificationData.email;
 
     // Step 2: Check if OTP expired
     const now = new Date();
@@ -59,32 +79,32 @@ export async function POST(request: NextRequest) {
           verified: false,
           verified_at: null,
         })
-        .eq('phone_no', phone_no);
+        .eq('email', targetEmail);
       return NextResponse.json(
         {
           error: 'OTP has expired. Please request a new OTP.',
           expired_at: verificationData.expires_at,
         },
-        { status: 400 }
+        { status: 400, headers: corsHeaders(origin) }
       );
     }
 
     // Step 3: Check if already verified
     if (verificationData.verified) {
-      console.log('⚠️ Phone number already verified - require new OTP');
+      console.log('⚠️ Email address already verified - require new OTP');
       await supabaseAdmin
         .from('verification')
         .update({
           verified: false,
           verified_at: null,
         })
-        .eq('phone_no', phone_no);
+        .eq('email', targetEmail);
       return NextResponse.json(
         {
-          error: 'Phone number already verified. Please request a new OTP to verify again.',
+          error: 'Email already verified. Please request a new OTP to verify again.',
           verified_at: verificationData.verified_at,
         },
-        { status: 409 }
+        { status: 409, headers: corsHeaders(origin) }
       );
     }
 
@@ -96,66 +116,85 @@ export async function POST(request: NextRequest) {
           error: 'Too many failed attempts. Please request a new OTP.',
           max_attempts: MAX_ATTEMPTS,
         },
-        { status: 429 }
+        { status: 429, headers: corsHeaders(origin) }
       );
     }
 
     // Step 5: Verify OTP
     if (verificationData.otp !== otp) {
+      console.warn('❌ Invalid OTP provided');
+      
       // Increment attempts
-      const newAttempts = verificationData.attempts + 1;
       await supabaseAdmin
         .from('verification')
-        .update({ attempts: newAttempts })
-        .eq('phone_no', phone_no);
+        .update({
+          attempts: verificationData.attempts + 1
+        })
+        .eq('email', targetEmail);
 
-      console.error(`❌ Invalid OTP (attempt ${newAttempts}/${MAX_ATTEMPTS})`);
       return NextResponse.json(
-        {
-          error: 'Invalid OTP',
-          attempts_remaining: MAX_ATTEMPTS - newAttempts,
-        },
-        { status: 400 }
+        { error: 'Invalid OTP. Please try again.' },
+        { status: 400, headers: corsHeaders(origin) }
       );
     }
 
-    // Step 6: OTP is correct - mark as verified
-    console.log('✅ OTP verified successfully');
-
-    const { data: updatedData, error: updateError } = await supabaseAdmin
+    // Step 6: Mark as verified
+    console.log('✅ OTP Verified Successfully!');
+    const { error: updateError } = await supabaseAdmin
       .from('verification')
       .update({
         verified: true,
         verified_at: new Date().toISOString(),
+        attempts: 0
       })
-      .eq('phone_no', phone_no)
-      .select()
-      .single();
+      .eq('email', targetEmail);
 
     if (updateError) {
-      console.error('Failed to update verification status:', updateError);
+      console.error('Failed to mark OTP as verified:', updateError);
       return NextResponse.json(
-        { error: 'Failed to update verification status' },
-        { status: 500 }
+        { error: 'Failed to verify OTP' },
+        { status: 500, headers: corsHeaders(origin) }
       );
     }
 
-    // Step 7: Get user details from generations table
+    // Step 7: Get user data to return
     const { data: userData, error: userError } = await supabaseAdmin
       .from('generations')
-      .select('id, name, email, phone_no, generated_image_url')
-      .eq('phone_no', phone_no)
+      .select('*')
+      .eq('id', verificationData.generation_id)
       .single();
 
     if (userError) {
-      console.warn('Could not fetch user data:', userError);
+      console.error('Failed to fetch user data after verification:', userError);
+      // Return success but with limited data
+      return NextResponse.json({
+        success: true,
+        message: 'OTP verified successfully',
+        verified_at: new Date().toISOString(),
+      }, {
+        headers: corsHeaders(origin),
+      });
+    }
+
+    // Check if image URL needs to be signed
+    let user = userData;
+    if (user && user.aws_key && !user.generated_image_url?.includes('X-Amz-Signature')) {
+        console.log('🔄 Generating fresh signed URL for user:', user.email);
+        // Use getPresignedUrl instead of getSignedDownloadUrl which doesn't exist
+        const signedUrl = await S3Service.getPresignedUrl(user.aws_key);
+        if (signedUrl) {
+            user.generated_image_url = signedUrl;
+            // Optionally update DB
+        }
     }
 
     return NextResponse.json({
       success: true,
-      message: 'Phone number verified successfully',
-      verified_at: updatedData.verified_at,
-      user: userData || null,
+      message: 'OTP verified successfully',
+      verified_at: new Date().toISOString(),
+      user: user,
+    }, {
+      headers: corsHeaders(origin),
     });
 
   } catch (error: any) {
@@ -165,7 +204,7 @@ export async function POST(request: NextRequest) {
         error: 'Failed to verify OTP',
         details: error?.message || 'Unknown error',
       },
-      { status: 500 }
+      { status: 500, headers: corsHeaders(origin) }
     );
   }
 }
