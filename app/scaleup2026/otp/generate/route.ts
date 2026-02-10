@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase/admin';
-import { OtpService, generateOTP } from '@/lib/otpService';
+import { generateOTP } from '@/lib/otpService';
 import { corsHeaders, handleCorsOptions } from '@/lib/cors';
 import nodemailer from 'nodemailer';
 import fs from 'fs';
