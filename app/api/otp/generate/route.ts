@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase/admin';
-import { OtpService, generateOTP } from '@/lib/otpService';
+import { generateOTP } from '@/lib/otpService';
 
 export async function POST(request: NextRequest) {
   try {
@@ -121,7 +121,8 @@ export async function POST(request: NextRequest) {
       formattedPhone = `+91${phone_no}`;
     }
 
-    const smsResult = await OtpService.sendOtp(formattedPhone, otp);
+    // const smsResult = await OtpService.sendOtp(formattedPhone, otp);
+    const smsResult = { success: false, message: 'SMS service not implemented' };
 
     if (!smsResult.success) {
       console.warn('⚠️ SMS sending failed:', smsResult.message);
