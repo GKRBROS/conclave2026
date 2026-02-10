@@ -43,34 +43,41 @@ async function testEmail() {
     return;
   }
 
-  console.log('🔄 Generating presigned URL for testing...');
+  console.log('🔄 Generating presigned URLs for testing...');
   let imageUrl;
+  let downloadUrl;
   
   try {
-    // Generate Presigned URL
-    const command = new GetObjectCommand({
+    // Generate Viewable Presigned URL (for <img> tag)
+    const viewCommand = new GetObjectCommand({
       Bucket: BUCKET_NAME,
       Key: key,
     });
     
+    // Generate Downloadable Presigned URL (for <a> tag)
+    const downloadCommand = new GetObjectCommand({
+      Bucket: BUCKET_NAME,
+      Key: key,
+      ResponseContentDisposition: 'attachment; filename="scaleup-avatar.png"',
+    });
+    
     // 7 days expiry
-    imageUrl = await getSignedUrl(s3, command, { expiresIn: 604800 });
-    console.log(`✅ Generated Presigned URL: ${imageUrl}`);
+    imageUrl = await getSignedUrl(s3, viewCommand, { expiresIn: 604800 });
+    downloadUrl = await getSignedUrl(s3, downloadCommand, { expiresIn: 604800 });
+    
+    console.log(`✅ Generated View URL: ${imageUrl}`);
+    console.log(`✅ Generated Download URL: ${downloadUrl}`);
     
     // Escape for HTML
     const escapedImageUrl = imageUrl.replace(/&/g, '&amp;');
-    console.log(`✅ Escaped URL for HTML: ${escapedImageUrl}`);
+    const escapedDownloadUrl = downloadUrl.replace(/&/g, '&amp;');
 
-    // Verify URL access
-    console.log('🔄 Verifying URL access...');
-    // We can't easily fetch it here without axios/fetch, assuming it works if upload worked.
-    // But we can verify the structure.
-    
     console.log(`📧 Sending test email to ${email}...`);
     const templatePath = path.join(process.cwd(), 'send-mail', 'mail.html');
     let html = fs.readFileSync(templatePath, 'utf-8');
     
-    html = html.replace(/{{DOWNLOAD_URL}}/g, escapedImageUrl);
+    html = html.replace(/{{IMAGE_URL}}/g, escapedImageUrl);
+    html = html.replace(/{{DOWNLOAD_URL}}/g, escapedDownloadUrl);
 
     const transporter = nodemailer.createTransport({
       host: process.env.SMTP_HOST_NAME,

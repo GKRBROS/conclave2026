@@ -314,9 +314,23 @@ export async function POST(request: NextRequest) {
     const finalImagePath = await mergeImages(tempGeneratedFile, timestamp.toString(), name, organization);
 
     let finalImagePresignedUrl = finalImagePath;
+    let finalImageDownloadUrl = finalImagePath;
     try {
-      const finalKey = new URL(finalImagePath).pathname.replace(/^\//, '');
-      finalImagePresignedUrl = await S3Service.getPresignedUrl(finalKey, 604800); // 7 days expiry
+      // The finalImagePath is a full URL (public URL), we need to extract the key
+      // S3Service.uploadBuffer returns the key directly, but mergeImages returns the public URL?
+      // Let's check mergeImages. If it returns a URL, we extract the key.
+      // S3Service.getPublicUrl format: https://BUCKET.s3.REGION.amazonaws.com/KEY
+      // So pathname usually starts with /KEY
+      
+      // Wait, let's verify what mergeImages returns. 
+      // Assuming it returns the public URL as per line 318 usage.
+      
+      const finalKey = finalImagePath.includes('amazonaws.com') 
+        ? new URL(finalImagePath).pathname.replace(/^\//, '')
+        : finalImagePath; // Fallback if it returns key directly (unlikely based on line 318)
+
+      finalImagePresignedUrl = await S3Service.getPresignedUrl(finalKey, 604800, 'image/png'); // 7 days expiry
+      finalImageDownloadUrl = await S3Service.getDownloadPresignedUrl(finalKey, `scaleup-avatar-${timestamp}.png`, 604800, 'image/png');
     } catch (presignError) {
       console.warn('Failed to presign final image URL:', presignError);
     }
@@ -324,7 +338,7 @@ export async function POST(request: NextRequest) {
     let uploadedImagePresignedUrl = uploadedImageUrl;
     if (uploadedKey) {
       try {
-        uploadedImagePresignedUrl = await S3Service.getPresignedUrl(uploadedKey, 3600);
+        uploadedImagePresignedUrl = await S3Service.getPresignedUrl(uploadedKey, 3600, image.type);
       } catch (presignError) {
         console.warn('Failed to presign upload image URL:', presignError);
       }
@@ -452,8 +466,10 @@ export async function POST(request: NextRequest) {
       
       // Use the presigned URL for the email to ensure it is viewable/downloadable
       // This solves the issue where public URLs might be blocked by bucket policies
-      // We MUST escape the ampersands for HTML context to avoid breaking the link in some clients
-      const emailImageUrl = finalImagePresignedUrl.replace(/&/g, '&amp;');
+      // We do NOT escape ampersands here anymore, as it breaks the signature in some contexts
+      // and nodemailer/email clients usually handle URL encoding correctly.
+      const emailImageUrl = finalImagePresignedUrl;
+      const emailDownloadUrl = finalImageDownloadUrl;
 
       // We run this async without awaiting to not block the response
       (async () => {
@@ -461,7 +477,8 @@ export async function POST(request: NextRequest) {
           const templatePath = join(process.cwd(), 'send-mail', 'mail.html');
           let html = await readFile(templatePath, 'utf-8');
           
-          html = html.replace(/{{DOWNLOAD_URL}}/g, emailImageUrl);
+          html = html.replace(/{{IMAGE_URL}}/g, emailImageUrl);
+          html = html.replace(/{{DOWNLOAD_URL}}/g, emailDownloadUrl);
 
           const transporter = nodemailer.createTransport({
             host: process.env.SMTP_HOST_NAME,

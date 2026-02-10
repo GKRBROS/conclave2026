@@ -19,10 +19,26 @@ export class S3Service {
   /**
    * Get pre-signed URL for downloading a file from S3
    */
-  static async getPresignedUrl(key: string, expiresInSec = 3600): Promise<string> {
+  static async getPresignedUrl(key: string, expiresInSec = 3600, contentType?: string): Promise<string> {
     const command = new GetObjectCommand({
       Bucket: BUCKET_NAME,
       Key: key,
+      ResponseContentType: contentType,
+    });
+
+    const url = await getSignedUrl(s3, command, { expiresIn: expiresInSec });
+    return url;
+  }
+
+  /**
+   * Get pre-signed URL for downloading a file from S3 with attachment disposition
+   */
+  static async getDownloadPresignedUrl(key: string, filename: string, expiresInSec = 3600, contentType?: string): Promise<string> {
+    const command = new GetObjectCommand({
+      Bucket: BUCKET_NAME,
+      Key: key,
+      ResponseContentDisposition: `attachment; filename="${filename}"`,
+      ResponseContentType: contentType,
     });
 
     const url = await getSignedUrl(s3, command, { expiresIn: expiresInSec });
