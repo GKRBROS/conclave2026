@@ -23,6 +23,7 @@ export async function GET(request: NextRequest) {
     try {
         const { searchParams } = new URL(request.url);
         const imageUrl = searchParams.get('url');
+        const isDownload = searchParams.get('download') === 'true';
 
         if (!imageUrl) {
             return new NextResponse('Missing URL parameter', { status: 400 });
@@ -64,11 +65,19 @@ export async function GET(request: NextRequest) {
 
         const buffer = await streamToBuffer(Body);
 
+        const headers: Record<string, string> = {
+            'Content-Type': ContentType || 'image/png',
+            'Cache-Control': 'public, max-age=31536000, immutable',
+            'Access-Control-Allow-Origin': '*',
+            'Access-Control-Allow-Methods': 'GET, OPTIONS',
+        };
+
+        if (isDownload) {
+            headers['Content-Disposition'] = 'attachment; filename="conclave-poster.png"';
+        }
+
         return new Response(new Uint8Array(buffer), {
-            headers: {
-                'Content-Type': ContentType || 'image/png',
-                'Cache-Control': 'public, max-age=31536000, immutable',
-            },
+            headers,
         });
     } catch (error: any) {
         console.error('❌ Proxy error:', error);

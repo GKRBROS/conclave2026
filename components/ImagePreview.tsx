@@ -23,19 +23,19 @@ export default function ImagePreview({
     if (!finalImage) return;
 
     try {
-      const response = await fetch(finalImage);
-      const blob = await response.blob();
-      const url = window.URL.createObjectURL(blob);
+      // Use the image proxy to avoid CORS issues and force download
+      const proxyUrl = `/api/image-proxy?url=${encodeURIComponent(finalImage)}&download=true`;
+      
+      // Create a temporary link and click it
       const link = document.createElement("a");
-      link.href = url;
+      link.href = proxyUrl;
       link.download = "conclave-poster.png";
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
-      window.URL.revokeObjectURL(url);
     } catch (err) {
       console.error("Download failed:", err);
-      // Fallback: try opening in new tab
+      // Fallback: try opening in new tab (direct link)
       window.open(finalImage, "_blank");
     }
   };
