@@ -221,11 +221,46 @@ export async function POST(request: NextRequest) {
 
     const result = await apiResponse.json();
     console.timeEnd('OpenRouter_AI_Call');
+    
+    // Detailed logging for debugging
+    console.log('OpenRouter Response Structure:', JSON.stringify({
+      id: result.id,
+      model: result.model,
+      choices_length: result.choices?.length,
+      first_choice_message_keys: result.choices?.[0]?.message ? Object.keys(result.choices[0].message) : [],
+    }));
+
+    if (!result.choices || result.choices.length === 0) {
+       console.error('OpenRouter Error: No choices returned', JSON.stringify(result));
+       throw new Error('AI service returned an empty response');
+    }
+
     const responseMessage = result.choices[0].message;
     let generatedImageUrl: string | undefined = responseMessage.images?.[0]?.image_url?.url;
 
+    // Fallback: Check if image URL is in content (Markdown or plain URL)
+    if (!generatedImageUrl && responseMessage.content) {
+      console.log('Checking content for image URL...');
+      // Regex to find markdown image or direct URL
+      const markdownImageRegex = /!\[.*?\]\((.*?)\)/;
+      const urlRegex = /(https?:\/\/[^\s]+)/;
+      
+      const markdownMatch = responseMessage.content.match(markdownImageRegex);
+      if (markdownMatch && markdownMatch[1]) {
+        generatedImageUrl = markdownMatch[1];
+        console.log('Found image URL in markdown content');
+      } else {
+        const urlMatch = responseMessage.content.match(urlRegex);
+        if (urlMatch && urlMatch[1]) {
+          generatedImageUrl = urlMatch[1];
+          console.log('Found image URL in plain text content');
+        }
+      }
+    }
+
     if (!generatedImageUrl) {
-      throw new Error('No image returned from AI');
+      console.error('Full OpenRouter Response:', JSON.stringify(result, null, 2));
+      throw new Error('No image returned from AI (checked images array and content)');
     }
 
     // Process AI Image
