@@ -483,7 +483,11 @@ export async function POST(request: NextRequest) {
       // Presigned URLs are direct links that bypass S3 access restrictions (XML/Access Denied)
       const whatsappImageUrl = finalImagePresignedUrl;
 
-      WhatsappService.sendImage(finalPhone, whatsappImageUrl).then(res => {
+      // Extract the numeric phone number for WhatsApp service
+      const numericPhone = finalPhone.replace(/\D/g, '');
+      console.log(`📱 Sending to numeric phone: ${numericPhone}`);
+
+      WhatsappService.sendImage(numericPhone, whatsappImageUrl).then(res => {
         if (res.success) {
           console.log('✅ WhatsApp notification sent successfully');
         } else {
