@@ -16,8 +16,16 @@ export class WhatsappService {
         return { success: false, message: 'MakeMuPass API key not configured' };
       }
 
-      // Format phone number: remove '+' and any non-numeric characters
-      const formattedPhone = phoneNumber.replace(/\+/g, '').replace(/\D/g, '');
+      // Format phone number: remove all non-numeric characters (including '+')
+      let formattedPhone = phoneNumber.replace(/\D/g, '');
+
+      // Check if the number already starts with a country code (assuming 11-15 digits total)
+      // If it's exactly 10 digits, assume it's an Indian number and prepend 91
+      if (formattedPhone.length === 10) {
+        formattedPhone = '91' + formattedPhone;
+      }
+      // If it's more than 10 digits, we assume the first digits are the country code 
+      // already provided by the user/frontend, so we leave it as is.
 
       console.log(`📤 Sending WhatsApp image to ${formattedPhone}...`);
       console.log(`🔗 Image URL: ${imageUrl}`);

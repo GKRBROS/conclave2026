@@ -1,7 +1,7 @@
 import sharp from 'sharp';
 import { join } from 'path';
 import { existsSync } from 'fs';
-import { mkdir, writeFile } from 'fs/promises';
+import { mkdir } from 'fs/promises';
 import { S3Service } from '@/lib/s3Service';
 import { createCanvas, registerFont } from 'canvas';
 
@@ -29,16 +29,15 @@ const registerCanvasFonts = () => {
 
 export async function mergeImages(
   generatedImagePath: string,
-  timestamp: string,
+  uniqueId: string,
   name?: string,
   organization?: string
 ): Promise<string> {
   try {
     console.log('--- MERGE IMAGES DEBUG START ---');
+    console.log('uniqueId:', uniqueId);
     console.log('generatedImagePath:', generatedImagePath);
     console.log('Text Overlay:', { name, organization });
-
-    // Always upload to Supabase (no production/development check)
 
     // Load background image
     const backgroundPath = join(process.cwd(), 'public', 'background.png');
@@ -59,11 +58,9 @@ export async function mergeImages(
     console.log(`Dimensions - BG: ${bgWidth}x${bgHeight}, Layer: ${layerWidth}x${layerHeight}`);
 
     // STEP 1: Composite generated image BEHIND layer.png
-    // Auto-fit logic: Fill width 100% and constrain height to 60% for consistent poster look
-    // regardless of input aspect ratio.
     const charWidth = layerWidth;
-    const charHeight = Math.floor(layerHeight * 0.60); // Auto-fit height set to 60%
-    const charTopOffset = 350; // Moved up slightly as requested
+    const charHeight = Math.floor(layerHeight * 0.60);
+    const charTopOffset = 350;
     const charLeftOffset = 0;
 
     const layerWithCharacter = await sharp(layerPath)
@@ -83,7 +80,7 @@ export async function mergeImages(
       ])
       .toBuffer();
 
-    // STEP 2: Create Text Overlay if name/designation provided
+    // STEP 2: Create Text Overlay
     let finalCompositeLayers: any[] = [
       {
         input: await sharp(layerWithCharacter)
@@ -97,14 +94,11 @@ export async function mergeImages(
     ];
 
     if (name || organization) {
-      // Create text overlay using Canvas (better than SVG for text rendering)
       const canvasWidth = bgWidth;
       const canvasHeight = bgHeight;
-
       const nameText = name ? name.toUpperCase() : '';
       const desText = organization ? organization.toLowerCase().replace(/\b\w/g, (char) => char.toUpperCase()) : '';
 
-      // Auto-scaling logic
       const maxWidth = 900;
       const baseNameSize = 64;
       const baseDesSize = 36;
@@ -122,9 +116,6 @@ export async function mergeImages(
       const nameY = Math.floor(canvasHeight * 0.742);
       const desY = Math.floor(canvasHeight * 0.774);
 
-      console.log('Text overlay:', { nameText, desText, nameFontSize, desFontSize, nameY, desY });
-
-      // Create canvas with text using node-canvas
       try {
         registerCanvasFonts();
         const canvas = createCanvas(canvasWidth, canvasHeight);
@@ -162,7 +153,6 @@ export async function mergeImages(
           }
         };
 
-        // Draw name text (Cal Sans, size 64 max)
         if (nameText) {
           const fontSize = Math.max(nameFontSize, 24);
           drawTextWithKerning(
@@ -174,7 +164,6 @@ export async function mergeImages(
           );
         }
 
-        // Draw designation text (Geist, size 36 max, kerning -4%)
         if (desText) {
           const fontSize = Math.max(desFontSize, 18);
           const letterSpacingPx = -0.04 * fontSize;
@@ -189,8 +178,6 @@ export async function mergeImages(
         }
 
         const textBuffer = canvas.toBuffer('image/png');
-        console.log('Canvas text overlay created, buffer size:', textBuffer.length);
-
         finalCompositeLayers.push({
           input: textBuffer,
           top: 0,
@@ -199,21 +186,16 @@ export async function mergeImages(
         });
       } catch (canvasErr) {
         console.warn('Canvas text rendering failed, falling back to SVG:', canvasErr);
-        // Fallback to SVG if canvas fails
         const svgWidth = bgWidth;
         const svgHeight = bgHeight;
         let svgContent = `<svg width="${svgWidth}" height="${svgHeight}" xmlns="http://www.w3.org/2000/svg"><defs><style>text { font-family: Arial, sans-serif; }</style></defs>`;
-
         if (nameText) {
           svgContent += `<text x="${Math.floor(svgWidth / 2)}" y="${nameY}" fill="#000000" font-size="${Math.max(nameFontSize, 24)}" font-weight="600" font-family="Cal Sans, Arial, sans-serif" text-anchor="middle" dominant-baseline="middle">${nameText}</text>`;
         }
-
         if (desText) {
           svgContent += `<text x="${Math.floor(svgWidth / 2)}" y="${desY}" fill="#222222" font-size="${Math.max(desFontSize, 18)}" font-weight="400" font-family="Geist, Arial, sans-serif" letter-spacing="-0.04em" text-anchor="middle" dominant-baseline="middle">${desText}</text>`;
         }
-
         svgContent += `</svg>`;
-
         finalCompositeLayers.push({
           input: Buffer.from(svgContent),
           top: 0,
@@ -229,14 +211,10 @@ export async function mergeImages(
       .png()
       .toBuffer();
 
-    // Generate filename
-    const timestamp = Date.now();
-    const timestamp_str = timestamp.toString();
-    const outputFilename = `final-${timestamp_str}.png`;
+    // Generate unique filename
+    const outputFilename = `final-${uniqueId}.png`;
 
     console.log('Uploading final image to S3: final/');
-    console.log('Final buffer size:', finalBuffer.length, 'bytes');
-
     const finalKey = await S3Service.uploadBuffer(
       finalBuffer,
       'final',

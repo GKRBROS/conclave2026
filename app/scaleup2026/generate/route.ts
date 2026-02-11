@@ -112,8 +112,11 @@ export async function POST(request: NextRequest) {
     const buffer = Buffer.from(bytes);
 
     const timestamp = Date.now();
+    const requestId = Math.random().toString(36).substring(2, 15);
+    const uniqueId = `${timestamp}-${requestId}`;
+    
     const fileExtension = image.name.split('.').pop() || 'jpg';
-    const filename = `upload-${timestamp}.${fileExtension}`;
+    const filename = `upload-${uniqueId}.${fileExtension}`;
 
     const tmpUploadsPath = join('/tmp', 'uploads');
     const publicUploadsPath = join(process.cwd(), 'public', 'uploads');
@@ -274,16 +277,16 @@ export async function POST(request: NextRequest) {
     }
 
     // Save intermediate image
-    const generatedFilename = `generated-${timestamp}.png`;
+    const generatedFilename = `generated-${uniqueId}.png`;
     let finalGeneratedUrl = `/generated/${generatedFilename}`;
     let generatedKey: string | null = null;
-
+    
     // Save to /tmp
     const tmpGeneratedPath = join('/tmp', 'generated');
     await mkdir(tmpGeneratedPath, { recursive: true }).catch(() => { });
     const tempGeneratedFile = join(tmpGeneratedPath, generatedFilename);
     await writeFile(tempGeneratedFile, imageBuffer);
-
+    
     // Optional local save
     if (!isProduction) {
       try {
@@ -294,7 +297,7 @@ export async function POST(request: NextRequest) {
         console.warn('Could not save to public/generated (read-only FS):', err);
       }
     }
-
+    
     console.log('Uploading generated image to S3...');
     try {
       generatedKey = await S3Service.uploadBuffer(
@@ -308,11 +311,11 @@ export async function POST(request: NextRequest) {
     } catch (s3GenError) {
       console.error('S3 generated upload error:', s3GenError);
     }
-
+    
     // Merge with background
     // Pass the /tmp path for processing
-    const finalImagePath = await mergeImages(tempGeneratedFile, timestamp.toString(), name, organization);
-
+    const finalImagePath = await mergeImages(tempGeneratedFile, uniqueId, name, organization);
+    
     let finalImagePresignedUrl = finalImagePath;
     let finalImageDownloadUrl = finalImagePath;
     try {
@@ -328,9 +331,9 @@ export async function POST(request: NextRequest) {
       const finalKey = finalImagePath.includes('amazonaws.com') 
         ? new URL(finalImagePath).pathname.replace(/^\//, '')
         : finalImagePath; // Fallback if it returns key directly (unlikely based on line 318)
-
+    
       finalImagePresignedUrl = await S3Service.getPresignedUrl(finalKey, 604800, 'image/png'); // 7 days expiry
-      finalImageDownloadUrl = await S3Service.getDownloadPresignedUrl(finalKey, `scaleup-avatar-${timestamp}.png`, 604800, 'image/png');
+      finalImageDownloadUrl = await S3Service.getDownloadPresignedUrl(finalKey, `scaleup-avatar-${uniqueId}.png`, 604800, 'image/png');
     } catch (presignError) {
       console.warn('Failed to presign final image URL:', presignError);
     }
@@ -441,13 +444,10 @@ export async function POST(request: NextRequest) {
     // Step 8: Send WhatsApp message (Non-blocking)
     if (finalPhone) {
       console.log('📱 Triggering WhatsApp message...');
-      // We use the public URL for WhatsApp
-      // If we have a presigned URL, that might be better if the bucket is private
-      // But the user said "downloaded and viewable image url", and usually WhatsApp api likes direct links.
-      // S3Service.getPublicUrl returns the direct path.
-
-      // Let's ensure we use a URL that is accessible.
-      const whatsappImageUrl = finalImagePresignedUrl || finalImagePath;
+      
+      // Use the presigned URL for WhatsApp to ensure it is viewable/downloadable
+      // Presigned URLs are direct links that bypass S3 access restrictions (XML/Access Denied)
+      const whatsappImageUrl = finalImagePresignedUrl;
 
       WhatsappService.sendImage(finalPhone, whatsappImageUrl).then(res => {
         if (res.success) {
