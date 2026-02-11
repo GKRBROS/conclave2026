@@ -79,7 +79,7 @@ export async function POST(request: NextRequest) {
           verified: false,
           verified_at: null,
         })
-        .eq('email', email);
+        .eq('email', targetEmail);
       return NextResponse.json(
         {
           error: 'OTP has expired. Please request a new OTP.',
@@ -98,10 +98,10 @@ export async function POST(request: NextRequest) {
           verified: false,
           verified_at: null,
         })
-        .eq('email', email);
+        .eq('email', targetEmail);
       return NextResponse.json(
         {
-          error: 'Email address already verified. Please request a new OTP to verify again.',
+          error: 'Email already verified. Please request a new OTP to verify again.',
           verified_at: verificationData.verified_at,
         },
         { status: 409, headers: corsHeaders(origin) }
@@ -122,12 +122,14 @@ export async function POST(request: NextRequest) {
 
     // Step 5: Verify OTP
     if (verificationData.otp !== otp) {
+      console.warn('❌ Invalid OTP provided');
+      
       // Increment attempts
       const newAttempts = verificationData.attempts + 1;
       await supabaseAdmin
         .from('verification')
         .update({ attempts: newAttempts })
-        .eq('email', email);
+        .eq('email', targetEmail);
 
       console.error(`❌ Invalid OTP (attempt ${newAttempts}/${MAX_ATTEMPTS})`);
       return NextResponse.json(
@@ -147,8 +149,9 @@ export async function POST(request: NextRequest) {
       .update({
         verified: true,
         verified_at: new Date().toISOString(),
+        attempts: 0
       })
-      .eq('email', email)
+      .eq('email', targetEmail)
       .select()
       .single();
 
@@ -163,8 +166,8 @@ export async function POST(request: NextRequest) {
     // Step 7: Get user details from generations table (fetch latest generation)
     const { data: userData, error: userError } = await supabaseAdmin
       .from('generations')
-      .select('id, name, email, phone_no, organization, generated_image_url, created_at')
-      .eq('email', email)
+      .select('*')
+      .eq('email', targetEmail)
       .order('created_at', { ascending: false })
       .limit(1)
       .maybeSingle();
@@ -173,33 +176,48 @@ export async function POST(request: NextRequest) {
       console.warn('Could not fetch user data:', userError);
     }
 
-    // Step 8: Generate signed URL for the image if it exists
-    let signedImageUrl = null;
-    if (userData?.generated_image_url) {
-      try {
-        // Check if it's already a full URL (e.g. from OpenRouter fallback)
-        if (userData.generated_image_url.startsWith('http')) {
-             signedImageUrl = userData.generated_image_url;
-        } else {
-             // It's an S3 key, generate presigned URL
-             signedImageUrl = await S3Service.getPresignedUrl(userData.generated_image_url);
+    // Step 8: Generate signed URLs for the image if it exists
+    let user = userData;
+    let redirectTo = null;
+
+    if (user && user.aws_key) {
+        console.log('🔄 Generating fresh signed URLs for user:', user.email);
+        try {
+            // Always generate fresh presigned URLs to ensure they haven't expired
+            // user.generated_image_url is the primary preview URL
+            const signedUrl = await S3Service.getPresignedUrl(user.aws_key, 604800, 'image/png'); // 7 days
+            
+            // Generate a separate download URL with attachment disposition
+            const downloadUrl = await S3Service.getDownloadPresignedUrl(
+                user.aws_key, 
+                `scaleup-avatar-${user.id}.png`, 
+                604800, 
+                'image/png'
+            );
+
+            if (signedUrl) {
+                user.generated_image_url = signedUrl;
+                // Add explicit download and preview fields for the frontend
+                user.final_image_url = signedUrl;
+                user.download_url = downloadUrl;
+            }
+            console.log('✅ Signed URLs generated successfully');
+        } catch (s3Error) {
+            console.error('❌ Failed to generate signed URLs:', s3Error);
         }
-        console.log('✅ Generated signed URL for image');
-      } catch (err) {
-        console.error('❌ Failed to sign S3 URL:', err);
-      }
+    } else {
+        // User is registered but has no image
+        console.log('⚠️ User has no generated image, redirecting to generator');
+        redirectTo = 'generator';
     }
 
     return NextResponse.json({
       success: true,
       message: 'Email verified successfully',
       verified_at: updatedData.verified_at,
-      user_id: userData?.id || null,
-      user: {
-        ...userData,
-        signed_image_url: signedImageUrl
-      },
-      image_url: signedImageUrl, // Top-level for convenience
+      user: user,
+      redirectTo: redirectTo,
+      image_url: user?.generated_image_url || null, // Top-level for convenience
     }, {
       headers: corsHeaders(origin),
     });
