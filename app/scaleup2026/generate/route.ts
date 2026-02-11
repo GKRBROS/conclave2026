@@ -41,19 +41,50 @@ export async function POST(request: NextRequest) {
     // Use admin client for database operations
     const supabase = supabaseAdmin;
 
+    // Step 1: Parse and Validate Form Data
+    console.log('--- GENERATION START ---');
     const formData = await request.formData();
+    console.log('✓ Form data parsed');
+    
     const image = formData.get('photo') as File;
     const name = formData.get('name') as string;
     const email = formData.get('email') as string | null;
     const phone = formData.get('phone') as string | null;
     const phone_no_val = formData.get('phone_no') as string | null;
-    const finalPhone = phone || phone_no_val;
+    let finalPhone = phone || phone_no_val;
+    
+    // Normalize phone number for matching: remove non-numeric
+    if (finalPhone) {
+      const originalPhone = finalPhone;
+      finalPhone = finalPhone.replace(/\D/g, '');
+      // Add + prefix for DB matching if it was originally there or if it's 12 digits starting with 91
+      if (originalPhone.startsWith('+')) {
+        finalPhone = '+' + finalPhone;
+      } else if (finalPhone.length === 12 && finalPhone.startsWith('91')) {
+        finalPhone = '+' + finalPhone;
+      } else if (finalPhone.length === 10) {
+        finalPhone = '+91' + finalPhone;
+      }
+      console.log(`📱 Normalized phone: ${originalPhone} -> ${finalPhone}`);
+    }
     const district = formData.get('district') as string | null;
     const category = formData.get('category') as string | null;
     const organization = formData.get('organization') as string;
     let prompt_type = formData.get('prompt_type') as string;
 
+    console.log('Input data:', { 
+      name, 
+      email, 
+      finalPhone, 
+      organization, 
+      prompt_type,
+      imageName: image?.name,
+      imageSize: image?.size,
+      imageType: image?.type
+    });
+
     // Fix: If prompt_type is missing or invalid, default to 'prompt1'
+    // Also explicitly block "testing" or any other non-standard values
     if (!prompt_type || !['prompt1', 'prompt2', 'prompt3'].includes(prompt_type)) {
       console.log(`⚠️ Invalid prompt_type received: "${prompt_type}". Defaulting to "prompt1".`);
       prompt_type = 'prompt1';
@@ -111,9 +142,12 @@ export async function POST(request: NextRequest) {
     // Fix: If category is missing, default to 'Startups' (valid category for constraint)
     const finalCategory = (category && category.trim().length > 0) ? category.trim() : 'Startups';
 
+    console.log('--- PROCESSING START ---');
+    console.log('Step 2: Preparing image buffer');
     // Proceed with processing
     const bytes = await image.arrayBuffer();
     const buffer = Buffer.from(bytes);
+    console.log(`✓ Image buffer prepared: ${buffer.length} bytes`);
 
     const timestamp = Date.now();
     const requestId = Math.random().toString(36).substring(2, 15);
@@ -126,9 +160,11 @@ export async function POST(request: NextRequest) {
     const publicUploadsPath = join(process.cwd(), 'public', 'uploads');
 
     // Save to /tmp for intermediate processing (always works on Vercel)
+    console.log('Step 3: Saving to temporary storage');
     await mkdir(tmpUploadsPath, { recursive: true }).catch(() => { });
     const tempUploadFile = join(tmpUploadsPath, filename);
     await writeFile(tempUploadFile, buffer);
+    console.log(`✓ Saved to /tmp: ${tempUploadFile}`);
 
     // Save locally for debug/local preview (optional and non-blocking in prod)
     let uploadedImageUrl = `/uploads/${filename}`;
@@ -146,13 +182,40 @@ export async function POST(request: NextRequest) {
     const s3Key = `uploads/${timestamp}/${filename}`;
 
     // Upload to AWS S3
-    console.log('📤 Uploading input to AWS S3...');
+    console.log('Step 4: Uploading input to AWS S3...');
     try {
       uploadedKey = await S3Service.uploadBuffer(buffer, 'uploads', filename, image.type);
       uploadedImageUrl = S3Service.getPublicUrl(uploadedKey);
       console.log('✅ Uploaded to S3:', uploadedImageUrl);
+
+      // PRE-SAVE: Save the initial upload and basic info to the DB immediately
+    // This ensures we have a record even if AI generation fails later
+    if ((finalPhone && finalPhone.trim().length > 0) || (email && email.trim().length > 0)) {
+      console.log(`Step 5: Pre-saving initial upload for ${finalPhone ? 'phone: ' + finalPhone : 'email: ' + email}`);
+      
+      let updateQuery = supabase.from('generations').update({
+        name: name.trim(),
+        organization: organization.trim(),
+        photo_url: uploadedImageUrl,
+        prompt_type: prompt_type,
+        updated_at: new Date().toISOString(),
+      });
+
+      if (finalPhone) {
+        updateQuery = updateQuery.eq('phone_no', finalPhone.trim());
+      } else {
+        updateQuery = updateQuery.eq('email', email!.trim());
+      }
+
+      const { error: preSaveError } = await updateQuery;
+      if (preSaveError) {
+        console.warn('⚠️ Pre-save failed:', preSaveError.message);
+      } else {
+        console.log('✓ Pre-save successful');
+      }
+    }
     } catch (s3Error) {
-      console.error('S3 upload error:', s3Error);
+      console.error('❌ S3 upload error:', s3Error);
       return NextResponse.json(
         { error: 'Failed to upload image to S3' },
         { status: 500 }
@@ -160,7 +223,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Resize image for OpenRouter
-    console.log('Resizing input image for OpenRouter...');
+    console.log('Step 6: Resizing input image for OpenRouter...');
     const resizedBuffer = await sharp(buffer)
       .resize(1024, 1024, {
         fit: 'inside',
@@ -168,6 +231,7 @@ export async function POST(request: NextRequest) {
       })
       .jpeg({ quality: 85 })
       .toBuffer();
+    console.log(`✓ Image resized: ${resizedBuffer.length} bytes`);
 
     const base64Image = resizedBuffer.toString('base64');
     const dataUrl = `data:image/jpeg;base64,${base64Image}`;
@@ -178,21 +242,13 @@ export async function POST(request: NextRequest) {
     const apiKey = process.env.OPENROUTER_API_KEY;
     if (!apiKey) {
       console.error('❌ OPENROUTER_API_KEY is not configured');
-      console.error('   - Set OPENROUTER_API_KEY in .env.local');
-      console.error('   - Get a key from: https://openrouter.ai/keys');
-      throw new Error('OPENROUTER_API_KEY not configured. Get one from https://openrouter.ai/keys');
-    }
-
-    if (apiKey === 'your_valid_openrouter_key_here' || apiKey.length < 10) {
-      console.error('❌ OPENROUTER_API_KEY is invalid or placeholder');
-      console.error('   - Current value:', apiKey);
-      console.error('   - Get a valid key from: https://openrouter.ai/keys');
-      throw new Error('OPENROUTER_API_KEY is invalid. Get a valid key from https://openrouter.ai/keys');
+      throw new Error('OPENROUTER_API_KEY not configured');
     }
 
     // Call OpenRouter
-    console.log('✓ OpenRouter API key found, sending request...');
-    console.log('  Prompt preview:', prompt.substring(0, 80) + '...');
+    console.log('Step 7: Sending request to OpenRouter...');
+    console.log('  Model:', 'sourceful/riverflow-v2-fast-preview');
+    
     console.time('OpenRouter_AI_Call');
     const apiResponse = await fetch('https://openrouter.ai/api/v1/chat/completions', {
       method: 'POST',
@@ -200,6 +256,7 @@ export async function POST(request: NextRequest) {
         'Authorization': `Bearer ${apiKey}`,
         'Content-Type': 'application/json',
         'HTTP-Referer': 'https://github.com/GKRBROS/conclave2026',
+        'X-Title': 'ScaleUp Conclave 2026',
       },
       body: JSON.stringify({
         model: 'sourceful/riverflow-v2-fast-preview',
@@ -218,28 +275,27 @@ export async function POST(request: NextRequest) {
 
     if (!apiResponse.ok) {
       console.timeEnd('OpenRouter_AI_Call');
-      let errorDetail = 'Unknown error';
+      const status = apiResponse.status;
+      const statusText = apiResponse.statusText;
+      console.error(`❌ OpenRouter API failed with status ${status}: ${statusText}`);
+      
+      let errorDetail = '';
       try {
         const errorData = await apiResponse.json();
         errorDetail = JSON.stringify(errorData);
-        console.error('OpenRouter API Error Details:', errorDetail);
-      } catch (e) { }
-      throw new Error(`OpenRouter Error ${apiResponse.status}: ${errorDetail}`);
+        console.error('OpenRouter Error Body:', errorDetail);
+      } catch (e) {
+        errorDetail = 'Could not parse error response';
+      }
+      throw new Error(`AI Generation failed (${status}): ${errorDetail}`);
     }
 
     const result = await apiResponse.json();
     console.timeEnd('OpenRouter_AI_Call');
+    console.log('✓ OpenRouter response received');
     
-    // Detailed logging for debugging
-    console.log('OpenRouter Response Structure:', JSON.stringify({
-      id: result.id,
-      model: result.model,
-      choices_length: result.choices?.length,
-      first_choice_message_keys: result.choices?.[0]?.message ? Object.keys(result.choices[0].message) : [],
-    }));
-
     if (!result.choices || result.choices.length === 0) {
-       console.error('OpenRouter Error: No choices returned', JSON.stringify(result));
+       console.error('❌ OpenRouter Error: No choices returned', JSON.stringify(result));
        throw new Error('AI service returned an empty response');
     }
 
@@ -249,29 +305,21 @@ export async function POST(request: NextRequest) {
     // Fallback: Check if image URL is in content (Markdown or plain URL)
     if (!generatedImageUrl && responseMessage.content) {
       console.log('Checking content for image URL...');
-      // Regex to find markdown image or direct URL
-      const markdownImageRegex = /!\[.*?\]\((.*?)\)/;
       const urlRegex = /(https?:\/\/[^\s]+)/;
-      
-      const markdownMatch = responseMessage.content.match(markdownImageRegex);
-      if (markdownMatch && markdownMatch[1]) {
-        generatedImageUrl = markdownMatch[1];
-        console.log('Found image URL in markdown content');
-      } else {
-        const urlMatch = responseMessage.content.match(urlRegex);
-        if (urlMatch && urlMatch[1]) {
-          generatedImageUrl = urlMatch[1];
-          console.log('Found image URL in plain text content');
-        }
+      const urlMatch = responseMessage.content.match(urlRegex);
+      if (urlMatch && urlMatch[1]) {
+        generatedImageUrl = urlMatch[1];
+        console.log('✓ Found image URL in content');
       }
     }
 
     if (!generatedImageUrl) {
-      console.error('Full OpenRouter Response:', JSON.stringify(result, null, 2));
-      throw new Error('No image returned from AI (checked images array and content)');
+      console.error('❌ No image URL found in response');
+      throw new Error('No image returned from AI');
     }
 
     // Process AI Image
+    console.log('Step 8: Fetching and saving AI generated image');
     let imageBuffer: Buffer;
     if (generatedImageUrl.startsWith('data:')) {
       imageBuffer = Buffer.from(generatedImageUrl.split(',')[1], 'base64');
@@ -279,6 +327,7 @@ export async function POST(request: NextRequest) {
       const imageResponse = await fetch(generatedImageUrl);
       imageBuffer = Buffer.from(await imageResponse.arrayBuffer());
     }
+    console.log(`✓ AI image fetched: ${imageBuffer.length} bytes`);
 
     // Save intermediate image
     const generatedFilename = `generated-${uniqueId}.png`;
@@ -290,19 +339,9 @@ export async function POST(request: NextRequest) {
     await mkdir(tmpGeneratedPath, { recursive: true }).catch(() => { });
     const tempGeneratedFile = join(tmpGeneratedPath, generatedFilename);
     await writeFile(tempGeneratedFile, imageBuffer);
+    console.log(`✓ AI image saved to /tmp: ${tempGeneratedFile}`);
     
-    // Optional local save
-    if (!isProduction) {
-      try {
-        const publicGeneratedPath = join(process.cwd(), 'public', 'generated');
-        await mkdir(publicGeneratedPath, { recursive: true }).catch(() => { });
-        await writeFile(join(publicGeneratedPath, generatedFilename), imageBuffer);
-      } catch (err) {
-        console.warn('Could not save to public/generated (read-only FS):', err);
-      }
-    }
-    
-    console.log('Uploading generated image to S3...');
+    console.log('Step 9: Uploading generated image to S3...');
     try {
       generatedKey = await S3Service.uploadBuffer(
         imageBuffer,
@@ -313,12 +352,13 @@ export async function POST(request: NextRequest) {
       finalGeneratedUrl = S3Service.getPublicUrl(generatedKey);
       console.log('✅ Generated image uploaded to S3:', finalGeneratedUrl);
     } catch (s3GenError) {
-      console.error('S3 generated upload error:', s3GenError);
+      console.error('❌ S3 generated upload error:', s3GenError);
     }
     
     // Merge with background
-    // Pass the /tmp path for processing
+    console.log('Step 10: Merging with background template...');
     const finalImagePath = await mergeImages(tempGeneratedFile, uniqueId, name, organization);
+    console.log('✅ Merge complete:', finalImagePath);
     
     let finalImagePresignedUrl = finalImagePath;
     let finalImageDownloadUrl = finalImagePath;
@@ -352,71 +392,61 @@ export async function POST(request: NextRequest) {
     }
 
     // Save metadata to Supabase database
+    console.log(`💾 Saving record to database with prompt_type: ${prompt_type}`);
     let dbData, dbError;
 
-    // If phone number is provided, try to update existing user
+    // Search for existing user by phone or email
+    let existingUser = null;
+    
     if (finalPhone && finalPhone.trim().length > 0) {
       console.log(`📱 Searching for existing user with phone: ${finalPhone}`);
-
-      // Check if user exists
-      const { data: existingUser, error: searchError } = await supabase
+      const { data } = await supabase
         .from('generations')
         .select('*')
         .eq('phone_no', finalPhone.trim())
+        .maybeSingle();
+      existingUser = data;
+    }
+
+    if (!existingUser && email && email.trim().length > 0) {
+      console.log(`📧 Searching for existing user with email: ${email}`);
+      const { data } = await supabase
+        .from('generations')
+        .select('*')
+        .eq('email', email.trim().toLowerCase())
+        .maybeSingle();
+      existingUser = data;
+    }
+
+    if (existingUser) {
+      // User exists, update their record
+      console.log(`✓ Found existing user (ID: ${existingUser.id}), updating record...`);
+      const { data: updateData, error: updateError } = await supabase
+        .from('generations')
+        .update({
+          name: name.trim(),
+          organization: organization.trim(),
+          photo_url: uploadedImageUrl,
+          generated_image_url: finalImagePath,
+          aws_key: generatedKey,
+          prompt_type: prompt_type,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', existingUser.id)
+        .select()
         .single();
 
-      if (!searchError && existingUser) {
-        // User exists, update their record
-        console.log('✓ Found existing user, updating record...');
-        const { data: updateData, error: updateError } = await supabase
-          .from('generations')
-          .update({
-            name: name.trim(),
-            organization: organization.trim(),
-            photo_url: uploadedImageUrl,
-            generated_image_url: finalImagePath,
-            aws_key: generatedKey,
-            prompt_type: prompt_type,
-            updated_at: new Date().toISOString()
-          })
-          .eq('phone_no', finalPhone.trim())
-          .select()
-          .single();
-
-        dbData = updateData;
-        dbError = updateError;
-      } else {
-        // User not found, create new record
-        console.log('✓ No existing user found, creating new record...');
-        const { data: insertData, error: insertError } = await supabase
-          .from('generations')
-          .insert({
-            name: name.trim(),
-            email: email ? email.trim() : null,
-            phone_no: finalPhone.trim(),
-            district: finalDistrict,
-            category: finalCategory,
-            organization: organization.trim(),
-            photo_url: uploadedImageUrl,
-            generated_image_url: finalImagePath,
-            aws_key: generatedKey,
-            prompt_type: prompt_type
-          })
-          .select()
-          .single();
-
-        dbData = insertData;
-        dbError = insertError;
-      }
+      dbData = updateData;
+      dbError = updateError;
     } else {
-      // No phone_no provided, create new record
-      console.log('✓ No phone number provided, creating new record...');
+      // User not found, create new record
+      console.log('✓ No existing user found, creating new record...');
       const { data: insertData, error: insertError } = await supabase
         .from('generations')
         .insert({
           name: name.trim(),
-          email: email ? email.trim() : null,
-          phone_no: null,
+          email: email ? email.trim().toLowerCase() : null,
+          phone_no: finalPhone ? finalPhone.trim() : null,
           district: finalDistrict,
           category: finalCategory,
           organization: organization.trim(),

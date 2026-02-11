@@ -68,7 +68,19 @@ export async function POST(request: NextRequest) {
             );
         }
 
-        const trimmedPhone = finalPhone.trim();
+        let trimmedPhone = finalPhone.trim();
+        if (trimmedPhone) {
+            const originalPhone = trimmedPhone;
+            trimmedPhone = trimmedPhone.replace(/\D/g, '');
+            if (originalPhone.startsWith('+')) {
+                trimmedPhone = '+' + trimmedPhone;
+            } else if (trimmedPhone.length === 12 && trimmedPhone.startsWith('91')) {
+                trimmedPhone = '+' + trimmedPhone;
+            } else if (trimmedPhone.length === 10) {
+                trimmedPhone = '+91' + trimmedPhone;
+            }
+            console.log(`📱 Normalized registration phone: ${originalPhone} -> ${trimmedPhone}`);
+        }
         const trimmedEmail = email.trim();
 
         console.log(`🔍 Registering user with email: ${trimmedEmail} and phone: ${trimmedPhone}`);
@@ -97,6 +109,7 @@ export async function POST(request: NextRequest) {
                     district: district.trim(),
                     category: category.trim(),
                     organization: organization.trim(),
+                    prompt_type: 'prompt1', // Default to prompt1 on registration/update
                     updated_at: new Date().toISOString(),
                 })
                 .eq('id', existingUser.id)
@@ -131,6 +144,7 @@ export async function POST(request: NextRequest) {
                 district: district.trim(),
                 category: category.trim(),
                 organization: organization.trim(),
+                prompt_type: 'prompt1', // Default to prompt1 on registration
             })
             .select('id, name, organization')
             .single();

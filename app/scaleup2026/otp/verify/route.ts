@@ -163,7 +163,7 @@ export async function POST(request: NextRequest) {
     // Step 7: Get user details from generations table (fetch latest generation)
     const { data: userData, error: userError } = await supabaseAdmin
       .from('generations')
-      .select('id, name, email, generated_image_url, created_at')
+      .select('id, name, email, phone_no, organization, generated_image_url, created_at')
       .eq('email', email)
       .order('created_at', { ascending: false })
       .limit(1)

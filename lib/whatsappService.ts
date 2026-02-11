@@ -24,8 +24,11 @@ export class WhatsappService {
       if (formattedPhone.length === 10) {
         formattedPhone = '91' + formattedPhone;
       }
-      // If it's more than 10 digits, we assume the first digits are the country code 
-      // already provided by the user/frontend, so we leave it as is.
+      
+      // Dynamic country code handling: If the number starts with 00, replace with nothing (standard international prefix)
+      if (formattedPhone.startsWith('00')) {
+        formattedPhone = formattedPhone.substring(2);
+      }
 
       console.log(`📤 Sending WhatsApp image to ${formattedPhone}...`);
       console.log(`🔗 Image URL: ${imageUrl}`);
