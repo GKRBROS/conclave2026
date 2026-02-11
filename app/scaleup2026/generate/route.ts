@@ -106,6 +106,11 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Fix: If district is missing, default to 'General'
+    const finalDistrict = (district && district.trim().length > 0) ? district.trim() : 'General';
+    // Fix: If category is missing, default to 'Startups' (valid category for constraint)
+    const finalCategory = (category && category.trim().length > 0) ? category.trim() : 'Startups';
+
     // Proceed with processing
     const bytes = await image.arrayBuffer();
     const buffer = Buffer.from(bytes);
@@ -389,8 +394,8 @@ export async function POST(request: NextRequest) {
             name: name.trim(),
             email: email ? email.trim() : null,
             phone_no: finalPhone.trim(),
-            district: district ? district.trim() : null,
-            category: category ? category.trim() : null,
+            district: finalDistrict,
+            category: finalCategory,
             organization: organization.trim(),
             photo_url: uploadedImageUrl,
             generated_image_url: finalImagePath,
@@ -412,8 +417,8 @@ export async function POST(request: NextRequest) {
           name: name.trim(),
           email: email ? email.trim() : null,
           phone_no: null,
-          district: district ? district.trim() : null,
-          category: category ? category.trim() : null,
+          district: finalDistrict,
+          category: finalCategory,
           organization: organization.trim(),
           photo_url: uploadedImageUrl,
           generated_image_url: finalImagePath,
