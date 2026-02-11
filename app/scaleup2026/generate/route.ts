@@ -51,7 +51,13 @@ export async function POST(request: NextRequest) {
     const district = formData.get('district') as string | null;
     const category = formData.get('category') as string | null;
     const organization = formData.get('organization') as string;
-    const prompt_type = formData.get('prompt_type') as string;
+    let prompt_type = formData.get('prompt_type') as string;
+
+    // Fix: If prompt_type is missing or invalid, default to 'prompt1'
+    if (!prompt_type || !['prompt1', 'prompt2', 'prompt3'].includes(prompt_type)) {
+      console.log(`⚠️ Invalid prompt_type received: "${prompt_type}". Defaulting to "prompt1".`);
+      prompt_type = 'prompt1';
+    }
 
     // Field validations
     if (!image) {
@@ -71,13 +77,6 @@ export async function POST(request: NextRequest) {
     if (!organization || organization.trim().length === 0) {
       return NextResponse.json(
         { error: 'Organization is required' },
-        { status: 400 }
-      );
-    }
-
-    if (!prompt_type || !['prompt1', 'prompt2', 'prompt3'].includes(prompt_type)) {
-      return NextResponse.json(
-        { error: 'Valid prompt_type is required (prompt1, prompt2, or prompt3)' },
         { status: 400 }
       );
     }
