@@ -178,14 +178,20 @@ export async function POST(request: NextRequest) {
 
     // Check if image URL needs to be signed
     let user = userData;
-    if (user && user.aws_key && !user.generated_image_url?.includes('X-Amz-Signature')) {
-        console.log('🔄 Generating fresh signed URL for user:', user.email);
-        // Use getPresignedUrl instead of getSignedDownloadUrl which doesn't exist
-        const signedUrl = await S3Service.getPresignedUrl(user.aws_key);
-        if (signedUrl) {
-            user.generated_image_url = signedUrl;
-            // Optionally update DB
+    let redirectTo = null;
+
+    if (user && user.aws_key) {
+        if (!user.generated_image_url?.includes('X-Amz-Signature')) {
+            console.log('🔄 Generating fresh signed URL for user:', user.email);
+            const signedUrl = await S3Service.getPresignedUrl(user.aws_key);
+            if (signedUrl) {
+                user.generated_image_url = signedUrl;
+            }
         }
+    } else {
+        // User is registered but has no image
+        console.log('⚠️ User has no generated image, redirecting to generator');
+        redirectTo = 'generator';
     }
 
     return NextResponse.json({
@@ -193,6 +199,7 @@ export async function POST(request: NextRequest) {
       message: 'OTP verified successfully',
       verified_at: new Date().toISOString(),
       user: user,
+      redirectTo: redirectTo,
     }, {
       headers: corsHeaders(origin),
     });

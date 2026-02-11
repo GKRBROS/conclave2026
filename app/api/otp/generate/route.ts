@@ -59,7 +59,11 @@ export async function POST(request: NextRequest) {
     if (!generationData) {
       console.warn(`⚠️ Email not found in generations table: "${trimmedEmail}"`);
       return NextResponse.json(
-        { error: 'Email not registered. Please generate an avatar first.' },
+        { 
+          error: 'Email not registered. Please register first.',
+          redirectTo: 'registration',
+          message: 'Please register to generate your avatar.'
+        },
         { status: 404, headers: corsHeaders(origin) }
       );
     }
