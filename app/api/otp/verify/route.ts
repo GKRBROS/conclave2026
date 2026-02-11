@@ -181,12 +181,29 @@ export async function POST(request: NextRequest) {
     let redirectTo = null;
 
     if (user && user.aws_key) {
-        if (!user.generated_image_url?.includes('X-Amz-Signature')) {
-            console.log('🔄 Generating fresh signed URL for user:', user.email);
-            const signedUrl = await S3Service.getPresignedUrl(user.aws_key);
+        console.log('🔄 Generating fresh signed URLs for user:', user.email);
+        try {
+            // Always generate fresh presigned URLs to ensure they haven't expired
+            // user.generated_image_url is the primary preview URL
+            const signedUrl = await S3Service.getPresignedUrl(user.aws_key, 604800, 'image/png'); // 7 days
+            
+            // Generate a separate download URL with attachment disposition
+            const downloadUrl = await S3Service.getDownloadPresignedUrl(
+                user.aws_key, 
+                `scaleup-avatar-${user.id}.png`, 
+                604800, 
+                'image/png'
+            );
+
             if (signedUrl) {
                 user.generated_image_url = signedUrl;
+                // Add explicit download and preview fields for the frontend
+                user.final_image_url = signedUrl;
+                user.download_url = downloadUrl;
             }
+            console.log('✅ Signed URLs generated successfully');
+        } catch (s3Error) {
+            console.error('❌ Failed to generate signed URLs:', s3Error);
         }
     } else {
         // User is registered but has no image
