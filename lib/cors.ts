@@ -10,6 +10,7 @@ export function corsHeaders(origin?: string) {
     'http://13.127.247.90',
     'https://www.conclave2026.com',
     'https://scaleup.frameforge.one/',
+    'https://scaleupconclave.com',
   ];
 
   const requestOrigin = origin || '';

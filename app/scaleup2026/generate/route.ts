@@ -9,6 +9,7 @@ import { corsHeaders, handleCorsOptions } from '@/lib/cors';
 import OpenAI from 'openai';
 import sharp from 'sharp';
 import { WhatsappService } from '@/lib/whatsappService';
+import { v4 as uuidv4 } from 'uuid';
 
 export const maxDuration = 600; // Increase timeout for long AI generation
 
@@ -149,9 +150,8 @@ export async function POST(request: NextRequest) {
     const buffer = Buffer.from(bytes);
     console.log(`✓ Image buffer prepared: ${buffer.length} bytes`);
 
+    const uniqueId = uuidv4();
     const timestamp = Date.now();
-    const requestId = Math.random().toString(36).substring(2, 15);
-    const uniqueId = `${timestamp}-${requestId}`;
     
     const fileExtension = image.name.split('.').pop() || 'jpg';
     const filename = `upload-${uniqueId}.${fileExtension}`;
