@@ -164,10 +164,11 @@ export async function POST(request: NextRequest) {
     }
 
     // Step 7: Get user details from generations table (fetch latest generation)
+    // Use ilike for email lookup to ensure case-insensitivity
     const { data: userData, error: userError } = await supabaseAdmin
       .from('generations')
       .select('*')
-      .eq('email', targetEmail)
+      .ilike('email', targetEmail)
       .order('created_at', { ascending: false })
       .limit(1)
       .maybeSingle();

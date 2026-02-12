@@ -362,6 +362,7 @@ export async function POST(request: NextRequest) {
     
     let finalImagePresignedUrl = finalImagePath;
     let finalImageDownloadUrl = finalImagePath;
+    let finalKey = '';
     try {
       // The finalImagePath is a full URL (public URL), we need to extract the key
       // S3Service.uploadBuffer returns the key directly, but mergeImages returns the public URL?
@@ -372,7 +373,7 @@ export async function POST(request: NextRequest) {
       // Wait, let's verify what mergeImages returns. 
       // Assuming it returns the public URL as per line 318 usage.
       
-      const finalKey = finalImagePath.includes('amazonaws.com') 
+      finalKey = finalImagePath.includes('amazonaws.com') 
         ? new URL(finalImagePath).pathname.replace(/^\//, '')
         : finalImagePath; // Fallback if it returns key directly (unlikely based on line 318)
     
@@ -428,7 +429,7 @@ export async function POST(request: NextRequest) {
           organization: organization.trim(),
           photo_url: uploadedImageUrl,
           generated_image_url: finalImagePath,
-          aws_key: generatedKey,
+          aws_key: finalKey, // Use the final merged image key instead of intermediate generatedKey
           prompt_type: prompt_type,
           updated_at: new Date().toISOString()
         })
@@ -452,7 +453,7 @@ export async function POST(request: NextRequest) {
           organization: organization.trim(),
           photo_url: uploadedImageUrl,
           generated_image_url: finalImagePath,
-          aws_key: generatedKey,
+          aws_key: finalKey, // Use the final merged image key instead of intermediate generatedKey
           prompt_type: prompt_type
         })
         .select()
