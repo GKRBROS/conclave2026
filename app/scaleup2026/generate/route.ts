@@ -38,6 +38,8 @@ const PROMPTS = {
 export async function POST(request: NextRequest) {
   const origin = request.headers.get('origin') || undefined;
   const isProduction = process.env.NODE_ENV === 'production';
+  let dbData: any = null;
+  let dbError: any = null;
   try {
     // Use admin client for database operations
     const supabase = supabaseAdmin;
@@ -52,22 +54,36 @@ export async function POST(request: NextRequest) {
     const email = formData.get('email') as string | null;
     const phone = formData.get('phone') as string | null;
     const phone_no_val = formData.get('phone_no') as string | null;
-    let finalPhone = phone || phone_no_val;
+    const dial_code = formData.get('dial_code') as string | null;
+    const userIdFromForm = formData.get('userId') as string | null;
+
+    let finalPhoneBase = phone || phone_no_val;
+    const finalDialCode = dial_code || '+91';
+    let finalPhone = finalPhoneBase;
     
     // Normalize phone number for matching: remove non-numeric
-    if (finalPhone) {
-      const originalPhone = finalPhone;
-      finalPhone = finalPhone.replace(/\D/g, '');
-      // Add + prefix for DB matching if it was originally there or if it's 12 digits starting with 91
+    if (finalPhoneBase) {
+      const originalPhone = finalPhoneBase;
+      const cleaned = finalPhoneBase.replace(/\D/g, '');
+      
       if (originalPhone.startsWith('+')) {
-        finalPhone = '+' + finalPhone;
-      } else if (finalPhone.length === 12 && finalPhone.startsWith('91')) {
-        finalPhone = '+' + finalPhone;
-      } else if (finalPhone.length === 10) {
-        finalPhone = '+91' + finalPhone;
+        finalPhone = '+' + cleaned;
+      } else {
+        const cleanDialCode = finalDialCode.replace(/\D/g, '');
+        if (cleaned.startsWith(cleanDialCode)) {
+          finalPhone = '+' + cleaned;
+        } else {
+          finalPhone = '+' + cleanDialCode + cleaned;
+        }
       }
-      console.log(`📱 Normalized phone: ${originalPhone} -> ${finalPhone}`);
+      console.log(`📱 Normalized phone: ${originalPhone} (dial: ${finalDialCode}) -> ${finalPhone}`);
     }
+    
+    // Determine the primary identifier (UUID priority)
+    const isUuid = userIdFromForm && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(userIdFromForm);
+    const lookupId = isUuid ? userIdFromForm : (finalPhone || email);
+    const lookupField = isUuid ? 'id' : (finalPhone ? 'phone_no' : 'email');
+
     const district = formData.get('district') as string | null;
     const category = formData.get('category') as string | null;
     const organization = formData.get('organization') as string;
@@ -190,22 +206,20 @@ export async function POST(request: NextRequest) {
 
       // PRE-SAVE: Save the initial upload and basic info to the DB immediately
     // This ensures we have a record even if AI generation fails later
-    if ((finalPhone && finalPhone.trim().length > 0) || (email && email.trim().length > 0)) {
-      console.log(`Step 5: Pre-saving initial upload for ${finalPhone ? 'phone: ' + finalPhone : 'email: ' + email}`);
+    if (lookupId) {
+      console.log(`Step 5: Pre-saving initial upload for ${lookupField}: ${lookupId}`);
       
       let updateQuery = supabase.from('generations').update({
         name: name.trim(),
         organization: organization.trim(),
         photo_url: uploadedImageUrl,
+        generated_image_url: null, // Clear old image during new generation
+        aws_key: null,            // Clear old key
         prompt_type: prompt_type,
         updated_at: new Date().toISOString(),
       });
 
-      if (finalPhone) {
-        updateQuery = updateQuery.eq('phone_no', finalPhone.trim());
-      } else {
-        updateQuery = updateQuery.eq('email', email!.trim());
-      }
+      updateQuery = updateQuery.eq(lookupField, lookupId);
 
       const { error: preSaveError } = await updateQuery;
       if (preSaveError) {
@@ -413,12 +427,21 @@ export async function POST(request: NextRequest) {
     // Save metadata to Supabase database
     console.log(`💾 Saving record to database with prompt_type: ${prompt_type}`);
     console.log(`   Final Key to store: ${finalKey}`);
-    let dbData, dbError;
 
-    // Search for existing user by phone or email
+    // Search for existing user by prioritized ID (UUID > Phone > Email)
     let existingUser = null;
     
-    if (finalPhone && finalPhone.trim().length > 0) {
+    if (isUuid) {
+      console.log(`🆔 Searching for existing user with UUID: ${lookupId}`);
+      const { data } = await supabase
+        .from('generations')
+        .select('*')
+        .eq('id', lookupId)
+        .maybeSingle();
+      existingUser = data;
+    }
+
+    if (!existingUser && finalPhone && finalPhone.trim().length > 0) {
       console.log(`📱 Searching for existing user with phone: ${finalPhone}`);
       const { data } = await supabase
         .from('generations')

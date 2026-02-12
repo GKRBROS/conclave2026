@@ -3,7 +3,7 @@ import { supabaseAdmin } from '@/lib/supabase/admin';
 import { corsHeaders, handleCorsOptions } from '@/lib/cors';
 
 const EMAIL_REGEX = /^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$/;
-const PHONE_REGEX = /^\+?[0-9]{10,15}$/;
+const PHONE_REGEX = /^\+?[0-9]{7,15}$/;
 const ALLOWED_CATEGORIES = [
     'Startups',
     'Working Professionals',
@@ -21,10 +21,11 @@ export async function POST(request: NextRequest) {
     const origin = request.headers.get('origin') || undefined;
     try {
         const body = await request.json();
-        const { name, email, phone, phone_no, district, category, organization, did_you_attend_the_previous_scaleup_conclave_ } = body;
+        const { name, email, phone, phone_no, dial_code, district, category, organization, did_you_attend_the_previous_scaleup_conclave_ } = body;
 
         // Handle both 'phone' (MakeMuPass) and 'phone_no' (Internal)
-        const finalPhone = phone || phone_no;
+        const finalPhoneBase = phone || phone_no;
+        const finalDialCode = dial_code || '+91'; // Default to +91 if not provided for backward compatibility
 
         if (!name || typeof name !== 'string' || name.trim().length === 0) {
             return NextResponse.json(
@@ -40,7 +41,7 @@ export async function POST(request: NextRequest) {
             );
         }
 
-        if (!finalPhone || typeof finalPhone !== 'string' || !PHONE_REGEX.test(finalPhone)) {
+        if (!finalPhoneBase || typeof finalPhoneBase !== 'string' || !PHONE_REGEX.test(finalPhoneBase)) {
             return NextResponse.json(
                 { error: 'Valid phone number is required (10-15 digits)' },
                 { status: 400, headers: corsHeaders(origin) }
@@ -68,19 +69,22 @@ export async function POST(request: NextRequest) {
             );
         }
 
-        let trimmedPhone = finalPhone.trim();
-        if (trimmedPhone) {
-            const originalPhone = trimmedPhone;
-            trimmedPhone = trimmedPhone.replace(/\D/g, '');
-            if (originalPhone.startsWith('+')) {
-                trimmedPhone = '+' + trimmedPhone;
-            } else if (trimmedPhone.length === 12 && trimmedPhone.startsWith('91')) {
-                trimmedPhone = '+' + trimmedPhone;
-            } else if (trimmedPhone.length === 10) {
-                trimmedPhone = '+91' + trimmedPhone;
+        let trimmedPhone = finalPhoneBase.trim();
+        const cleaned = trimmedPhone.replace(/\D/g, '');
+        
+        if (trimmedPhone.startsWith('+')) {
+            trimmedPhone = '+' + cleaned;
+        } else {
+            // Prepend dial code if not already present
+            const cleanDialCode = finalDialCode.replace(/\D/g, '');
+            if (cleaned.startsWith(cleanDialCode)) {
+                trimmedPhone = '+' + cleaned;
+            } else {
+                trimmedPhone = '+' + cleanDialCode + cleaned;
             }
-            console.log(`📱 Normalized registration phone: ${originalPhone} -> ${trimmedPhone}`);
         }
+        console.log(`📱 Normalized registration phone: ${finalPhoneBase} (dial: ${finalDialCode}) -> ${trimmedPhone}`);
+
         const trimmedEmail = email.trim();
 
         console.log(`🔍 Registering user with email: ${trimmedEmail} and phone: ${trimmedPhone}`);
