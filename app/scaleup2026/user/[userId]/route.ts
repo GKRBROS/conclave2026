@@ -83,7 +83,12 @@ export async function GET(
           details: 'Image is being generated. Please wait and try retrieving the result.',
           status: 504
         },
-        { status: 202, headers: corsHeaders(origin) }
+        { status: 202, headers: {
+          ...corsHeaders(origin),
+          'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
+          'Pragma': 'no-cache',
+          'Expires': '0'
+        } }
       );
     }
 
@@ -98,8 +103,17 @@ export async function GET(
     // Return only the final image URL
     return NextResponse.json({
       success: true,
-      final_image_url: finalImageUrl
-    }, { headers: corsHeaders(origin) });
+      user_id: normalizedId,
+      final_image_url: finalImageUrl,
+    }, {
+      headers: {
+        ...corsHeaders(origin),
+        'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
+        'Pragma': 'no-cache',
+        'Expires': '0',
+        'Surrogate-Control': 'no-store'
+      }
+    });
   } catch (error: any) {
     console.error('Error fetching user details:', error);
     return NextResponse.json(

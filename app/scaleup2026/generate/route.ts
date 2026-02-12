@@ -159,6 +159,32 @@ export async function POST(request: NextRequest) {
     // Fix: If category is missing, default to 'Startups' (valid category for constraint)
     const finalCategory = (category && category.trim().length > 0) ? category.trim() : 'Startups';
 
+    // ============================================
+    // STEP 1.5: IMMEDIATELY CLEAR STALE IMAGE DATA
+    // ============================================
+    // We clear these fields BEFORE S3 upload to prevent polling from returning the previous image
+    if (lookupId) {
+      console.log(`Step 1.5: Clearing stale image data for ${lookupField}: ${lookupId}`);
+      try {
+        const { error: clearError } = await supabaseAdmin
+          .from('generations')
+          .update({
+            generated_image_url: null,
+            aws_key: null,
+            updated_at: new Date().toISOString()
+          })
+          .eq(lookupField, lookupId);
+        
+        if (clearError) {
+          console.warn('⚠️ Initial clear failed:', clearError.message);
+        } else {
+          console.log('✓ Stale image data cleared');
+        }
+      } catch (err) {
+        console.warn('⚠️ Initial clear exception:', err);
+      }
+    }
+
     console.log('--- PROCESSING START ---');
     console.log('Step 2: Preparing image buffer');
     // Proceed with processing
@@ -213,8 +239,7 @@ export async function POST(request: NextRequest) {
         name: name.trim(),
         organization: organization.trim(),
         photo_url: uploadedImageUrl,
-        generated_image_url: null, // Clear old image during new generation
-        aws_key: null,            // Clear old key
+        // generated_image_url and aws_key are already cleared in Step 1.5
         prompt_type: prompt_type,
         updated_at: new Date().toISOString(),
       });
