@@ -512,6 +512,13 @@ export async function POST(request: NextRequest) {
       });
     }
 
+    // Update the dbData with the presigned URLs for the response
+    if (dbData) {
+      dbData.generated_image_url = finalImagePresignedUrl;
+      dbData.final_image_url = finalImagePresignedUrl;
+      dbData.download_url = finalImageDownloadUrl;
+    }
+
     // Step 9: Send Email (Non-blocking)
     if (email && email.trim().length > 0) {
       console.log(`📧 Sending email to ${email}...`);
@@ -563,7 +570,8 @@ export async function POST(request: NextRequest) {
       aws_key: dbData.aws_key,
       photo_url: uploadedImagePresignedUrl,
       generated_image_url: finalImagePresignedUrl,
-      final_image_url: finalImagePresignedUrl
+      final_image_url: finalImagePresignedUrl,
+      download_url: finalImageDownloadUrl
     }, {
       headers: corsHeaders(origin),
     });
