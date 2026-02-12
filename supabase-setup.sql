@@ -209,22 +209,19 @@ BEGIN
     CHECK (phone_no IS NULL OR phone_no ~* '^\+?[0-9]{10,15}$');
 END $$;
 
--- Add category constraint
-DO $$ 
-BEGIN
-  -- Drop old constraint if exists
-  IF EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'category_format') THEN
-    ALTER TABLE public.generations DROP CONSTRAINT category_format;
-  END IF;
-  -- Add new constraint
-  ALTER TABLE public.generations ADD CONSTRAINT category_format 
-    CHECK (category IN ('Startups', 'Working Professionals', 'Students', 'Business Owners', 'NRI / Gulf Retunees', 'Government Officials', 'Other'));
-END $$;
-
 -- Add prompt_type constraint
 DO $$ 
 BEGIN
-  -- Drop old constraint if exists
+  -- Drop old constraints if they exist
+  IF EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'category_format') THEN
+    ALTER TABLE public.generations DROP CONSTRAINT category_format;
+  END IF;
+  
+  -- Drop system-generated category constraint if it exists
+  IF EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'generations_category_check') THEN
+    ALTER TABLE public.generations DROP CONSTRAINT generations_category_check;
+  END IF;
+
   IF EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'prompt_type_format') THEN
     ALTER TABLE public.generations DROP CONSTRAINT prompt_type_format;
   END IF;
@@ -255,7 +252,6 @@ CREATE TABLE IF NOT EXISTS public.generations (
   -- Add constraints
   CONSTRAINT email_format CHECK (email ~* '^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$'),
   CONSTRAINT phone_format CHECK (phone_no ~* '^\+?[0-9]{10,15}$'),
-  CONSTRAINT category_format CHECK (category IN ('Startups', 'Working Professionals', 'Students', 'Business Owners', 'NRI / Gulf Retunees', 'Government Officials', 'Other')),
   CONSTRAINT prompt_type_format CHECK (prompt_type IN ('prompt1', 'prompt2', 'prompt3'))
 );
 

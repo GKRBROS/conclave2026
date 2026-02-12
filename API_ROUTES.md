@@ -197,7 +197,7 @@ Fields:
   "email": "john@example.com",
   "phone_no": "+919876543210",
   "district": "Kannur",
-  "category": "Students",
+  "category": "Any Category Name",
   "organization": "tfg"
 }
 ```

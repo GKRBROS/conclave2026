@@ -4,14 +4,6 @@ import { corsHeaders, handleCorsOptions } from '@/lib/cors';
 
 const EMAIL_REGEX = /^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$/;
 const PHONE_REGEX = /^\+?[0-9]{7,15}$/;
-const ALLOWED_CATEGORIES = [
-    'Startups',
-    'Working Professionals',
-    'Students',
-    'Business Owners',
-    'NRI / Gulf Retunees',
-    'Government Officials',
-];
 
 export async function OPTIONS(request: NextRequest) {
     return handleCorsOptions(request);
@@ -55,9 +47,9 @@ export async function POST(request: NextRequest) {
             );
         }
 
-        if (!category || typeof category !== 'string' || (!ALLOWED_CATEGORIES.includes(category) && category !== 'Other')) {
+        if (!category || typeof category !== 'string' || category.trim().length === 0) {
             return NextResponse.json(
-                { error: 'Valid category is required' },
+                { error: 'Category is required' },
                 { status: 400, headers: corsHeaders(origin) }
             );
         }

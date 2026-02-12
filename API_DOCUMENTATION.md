@@ -36,21 +36,10 @@ POST /api/generate
 | `email`        | string | ✅       | Valid email address (regex validated)                               |
 | `phone_no`     | string | ✅       | Phone number (10-15 digits, with optional + prefix)                 |
 | `district`     | string | ✅       | District/region name (cannot be empty)                              |
-| `category`     | string | ✅       | User category (must be one of the 6 options below)                  |
+| `category`     | string | ✅       | User category (e.g., Students, Business Owners, etc.)               |
 | `organization` | string | ✅       | Organization/company name (cannot be empty)                         |
 | `prompt_type`  | string | ✅       | Avatar style type (must be one of: `prompt1`, `prompt2`, `prompt3`) |
 | `photo`        | File   | ✅       | User's photo for avatar generation                                  |
-
-### Category Options
-
-The `category` field must be one of these values:
-
-- `Startups`
-- `Working Professionals`
-- `Students`
-- `Business Owners`
-- `NRI / Gulf Retunees`
-- `Government Officials`
 
 ### Avatar Style Types
 
