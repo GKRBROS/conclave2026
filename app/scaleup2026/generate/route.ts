@@ -355,28 +355,41 @@ export async function POST(request: NextRequest) {
       console.error('❌ S3 generated upload error:', s3GenError);
     }
     
-    // Merge with background
+    // STEP 10: Merging with background template
     console.log('Step 10: Merging with background template...');
-    const finalImagePath = await mergeImages(tempGeneratedFile, uniqueId, name, organization);
-    console.log('✅ Merge complete:', finalImagePath);
+    let finalImagePath: string;
+    try {
+      finalImagePath = await mergeImages(tempGeneratedFile, uniqueId, name, organization);
+      console.log('✅ Merge complete:', finalImagePath);
+    } catch (mergeError) {
+      console.error('❌ Merge error:', mergeError);
+      // Fallback to the generated image if merge fails
+      finalImagePath = finalGeneratedUrl;
+      console.log('⚠️ Falling back to raw generated image');
+    }
     
     let finalImagePresignedUrl = finalImagePath;
     let finalImageDownloadUrl = finalImagePath;
     let finalKey = '';
     try {
-      // The finalImagePath is a full URL (public URL), we need to extract the key
-      // S3Service.uploadBuffer returns the key directly, but mergeImages returns the public URL?
-      // Let's check mergeImages. If it returns a URL, we extract the key.
+      // The finalImagePath is a full URL (public URL) returned by mergeImages or finalGeneratedUrl
       // S3Service.getPublicUrl format: https://BUCKET.s3.REGION.amazonaws.com/KEY
-      // So pathname usually starts with /KEY
       
-      // Wait, let's verify what mergeImages returns. 
-      // Assuming it returns the public URL as per line 318 usage.
+      if (finalImagePath.includes('amazonaws.com')) {
+        try {
+          const url = new URL(finalImagePath);
+          // Remove leading slash from pathname to get the key
+          finalKey = url.pathname.replace(/^\//, '');
+        } catch (urlError) {
+          console.warn('Failed to parse finalImagePath as URL, using as key:', finalImagePath);
+          finalKey = finalImagePath;
+        }
+      } else {
+        // Fallback if it is already a key
+        finalKey = finalImagePath;
+      }
       
-      finalKey = finalImagePath.includes('amazonaws.com') 
-        ? new URL(finalImagePath).pathname.replace(/^\//, '')
-        : finalImagePath; // Fallback if it returns key directly (unlikely based on line 318)
-    
+      console.log('Generating presigned URLs for key:', finalKey);
       finalImagePresignedUrl = await S3Service.getPresignedUrl(finalKey, 604800, 'image/png'); // 7 days expiry
       finalImageDownloadUrl = await S3Service.getDownloadPresignedUrl(finalKey, `scaleup-avatar-${uniqueId}.png`, 604800, 'image/png');
     } catch (presignError) {
@@ -429,7 +442,7 @@ export async function POST(request: NextRequest) {
           organization: organization.trim(),
           photo_url: uploadedImageUrl,
           generated_image_url: finalImagePath,
-          aws_key: finalKey, // Use the final merged image key instead of intermediate generatedKey
+          aws_key: finalKey, // Use the final merged image key
           prompt_type: prompt_type,
           updated_at: new Date().toISOString()
         })
@@ -453,7 +466,7 @@ export async function POST(request: NextRequest) {
           organization: organization.trim(),
           photo_url: uploadedImageUrl,
           generated_image_url: finalImagePath,
-          aws_key: finalKey, // Use the final merged image key instead of intermediate generatedKey
+          aws_key: finalKey, // Use the final merged image key
           prompt_type: prompt_type
         })
         .select()

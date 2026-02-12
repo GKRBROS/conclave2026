@@ -57,14 +57,17 @@ export async function mergeImages(
 
     console.log(`Dimensions - BG: ${bgWidth}x${bgHeight}, Layer: ${layerWidth}x${layerHeight}`);
 
-    // STEP 1: Composite generated image BEHIND layer.png
-    const charWidth = layerWidth;
-    const charHeight = Math.floor(layerHeight * 0.60);
-    const charTopOffset = 350;
+    // STEP 1: Composite generated image OVER background.png but BEHIND layer.png
+    // The previous logic was compositing char over layer, then layer over bg.
+    // This is safer: Start with Background, put Character on it, then put Layer on top.
+
+    const charWidth = bgWidth;
+    const charHeight = Math.floor(bgHeight * 0.60);
+    const charTopOffset = Math.floor(bgHeight * 0.20); // Center vertically roughly
     const charLeftOffset = 0;
 
-    const layerWithCharacter = await sharp(layerPath)
-      .resize(layerWidth, layerHeight)
+    const bgWithCharacter = await sharp(backgroundPath)
+      .resize(bgWidth, bgHeight)
       .composite([
         {
           input: await sharp(generatedImagePath)
@@ -73,25 +76,29 @@ export async function mergeImages(
               position: 'top'
             })
             .toBuffer(),
-          blend: 'dest-over',
           top: charTopOffset,
-          left: charLeftOffset
+          left: charLeftOffset,
+          blend: 'over'
         }
       ])
       .toBuffer();
 
-    // STEP 2: Create Text Overlay
-    let finalCompositeLayers: any[] = [
-      {
-        input: await sharp(layerWithCharacter)
-          .resize(bgWidth, bgHeight, {
-            fit: 'cover'
-          })
-          .toBuffer(),
-        gravity: 'center',
-        blend: 'over'
-      }
-    ];
+    // STEP 2: Put layer.png on top (transparent frame)
+    const layerOnTop = await sharp(bgWithCharacter)
+      .composite([
+        {
+          input: await sharp(layerPath)
+            .resize(bgWidth, bgHeight, {
+              fit: 'cover'
+            })
+            .toBuffer(),
+          blend: 'over'
+        }
+      ])
+      .toBuffer();
+
+    // STEP 3: Create Text Overlay
+    let finalCompositeLayers: any[] = [];
 
     if (name || organization) {
       const canvasWidth = bgWidth;
@@ -205,7 +212,7 @@ export async function mergeImages(
       }
     }
 
-    const finalBuffer = await sharp(backgroundPath)
+    const finalBuffer = await sharp(layerOnTop)
       .resize(bgWidth, bgHeight)
       .composite(finalCompositeLayers)
       .png()
