@@ -61,36 +61,41 @@ export async function mergeImages(
     // The previous logic was compositing char over layer, then layer over bg.
     // This is safer: Start with Background, put Character on it, then put Layer on top.
 
-    const charWidth = 1080;
-    const charHeight = 1080;
-    const charTopOffset = 420; // Exact positioning for the frame
+    const charWidth = bgWidth;
+    const charHeight = Math.floor(bgHeight * 0.60);
+    const charTopOffset = Math.floor(bgHeight * 0.20); // Center vertically roughly
     const charLeftOffset = 0;
 
     console.log(`Compositing character at ${charLeftOffset},${charTopOffset} with size ${charWidth}x${charHeight}`);
+    console.log(`Source character image path: ${generatedImagePath}`);
+
+    const charImageBuffer = await sharp(generatedImagePath)
+      .resize(charWidth, charHeight, {
+        fit: 'cover',
+        position: 'top'
+      })
+      .toBuffer();
+    console.log('Character resized to buffer successfully');
 
     const bgWithCharacter = await sharp(backgroundPath)
-      .resize(1080, 1920) // Standardize to the target frame size
+      .resize(bgWidth, bgHeight)
       .composite([
         {
-          input: await sharp(generatedImagePath)
-            .resize(charWidth, charHeight, {
-              fit: 'cover',
-              position: 'center'
-            })
-            .toBuffer(),
+          input: charImageBuffer,
           top: charTopOffset,
           left: charLeftOffset,
           blend: 'over'
         }
       ])
       .toBuffer();
+    console.log('Character composited over background successfully');
 
     // STEP 2: Put layer.png on top (transparent frame)
     const layerOnTop = await sharp(bgWithCharacter)
       .composite([
         {
           input: await sharp(layerPath)
-            .resize(1080, 1920, {
+             .resize(bgWidth, bgHeight, {
               fit: 'cover'
             })
             .toBuffer(),
@@ -102,12 +107,11 @@ export async function mergeImages(
     // STEP 3: Create Text Overlay
     let finalCompositeLayers: any[] = [];
 
-    const finalWidth = 1080;
-    const finalHeight = 1920;
+
 
     if (name || organization) {
-      const canvasWidth = finalWidth;
-      const canvasHeight = finalHeight;
+      const canvasWidth = bgWidth;
+      const canvasHeight = bgHeight;
       const nameText = name ? name.toUpperCase() : '';
       const desText = organization ? organization.toLowerCase().replace(/\b\w/g, (char) => char.toUpperCase()) : '';
 
@@ -125,8 +129,8 @@ export async function mergeImages(
         ? Math.floor(baseDesSize * (maxWidth / desEstimatedWidth))
         : baseDesSize;
 
-      const nameY = Math.floor(canvasHeight * 0.82); // Adjusted for 1080x1920
-      const desY = Math.floor(canvasHeight * 0.85); // Adjusted for 1080x1920
+      const nameY = Math.floor(canvasHeight * 0.742);
+      const desY = Math.floor(canvasHeight * 0.774);
 
       try {
         registerCanvasFonts();
@@ -221,7 +225,7 @@ export async function mergeImages(
     }
 
     const finalBuffer = await sharp(layerOnTop)
-      .resize(finalWidth, finalHeight)
+      .resize(bgWidth, bgHeight)
       .composite(finalCompositeLayers)
       .png()
       .toBuffer();

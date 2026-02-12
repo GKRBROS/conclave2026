@@ -360,12 +360,12 @@ export async function POST(request: NextRequest) {
     let finalImagePath: string;
     try {
       finalImagePath = await mergeImages(tempGeneratedFile, uniqueId, name, organization);
-      console.log('✅ Merge complete:', finalImagePath);
+      console.log(`✅ Merge complete. Result URL: ${finalImagePath}`);
     } catch (mergeError) {
       console.error('❌ Merge error:', mergeError);
       // Fallback to the generated image if merge fails
       finalImagePath = finalGeneratedUrl;
-      console.log('⚠️ Falling back to raw generated image');
+      console.log(`⚠️ Falling back to raw generated image: ${finalImagePath}`);
     }
     
     let finalImagePresignedUrl = finalImagePath;
@@ -380,6 +380,7 @@ export async function POST(request: NextRequest) {
           const url = new URL(finalImagePath);
           // Remove leading slash from pathname to get the key
           finalKey = url.pathname.replace(/^\//, '');
+          console.log(`🔑 Extracted S3 Key for final image: ${finalKey}`);
         } catch (urlError) {
           console.warn('Failed to parse finalImagePath as URL, using as key:', finalImagePath);
           finalKey = finalImagePath;
@@ -387,11 +388,15 @@ export async function POST(request: NextRequest) {
       } else {
         // Fallback if it is already a key
         finalKey = finalImagePath;
+        console.log(`🔑 Using finalImagePath as S3 Key: ${finalKey}`);
       }
       
-      console.log('Generating presigned URLs for key:', finalKey);
+      console.log(`🚀 Generating presigned URLs for finalKey: ${finalKey}`);
       finalImagePresignedUrl = await S3Service.getPresignedUrl(finalKey, 604800, 'image/png'); // 7 days expiry
       finalImageDownloadUrl = await S3Service.getDownloadPresignedUrl(finalKey, `scaleup-avatar-${uniqueId}.png`, 604800, 'image/png');
+      console.log('✅ Presigned URLs generated:');
+      console.log(`   - Preview: ${finalImagePresignedUrl.substring(0, 50)}...`);
+      console.log(`   - Download: ${finalImageDownloadUrl.substring(0, 50)}...`);
     } catch (presignError) {
       console.warn('Failed to presign final image URL:', presignError);
     }
@@ -407,6 +412,7 @@ export async function POST(request: NextRequest) {
 
     // Save metadata to Supabase database
     console.log(`💾 Saving record to database with prompt_type: ${prompt_type}`);
+    console.log(`   Final Key to store: ${finalKey}`);
     let dbData, dbError;
 
     // Search for existing user by phone or email

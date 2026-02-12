@@ -10,7 +10,7 @@ const BUCKET_NAME = 'frameforge';
 // ==========================================
 // PASTE YOUR LOCKED URL HERE
 // ==========================================
-const LOCKED_URL = 'https://frameforge.s3.ap-south-1.amazonaws.com/final/1770874710761-final-5717e0f5-a2b1-4f10-8b59-1ac9b94e1cd9.png'
+const LOCKED_URL = 'https://frameforge.s3.ap-south-1.amazonaws.com/final/1770876329993-final-beae387f-08fd-4da9-af17-cb2319462f13.png'
 async function unlock() {
   if (LOCKED_URL === 'PASTE_YOUR_URL_HERE' || !LOCKED_URL) {
     console.error('❌ Please paste your S3 URL into the LOCKED_URL variable on line 13.');

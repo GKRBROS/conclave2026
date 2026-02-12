@@ -182,7 +182,7 @@ export async function POST(request: NextRequest) {
     let redirectTo = null;
 
     if (user && user.aws_key) {
-        console.log('🔄 Generating fresh signed URLs for user:', user.email);
+        console.log(`🔄 Generating fresh signed URLs for user: ${user.email}, S3 Key: ${user.aws_key}`);
         try {
             // Always generate fresh presigned URLs to ensure they haven't expired
             // user.generated_image_url is the primary preview URL
@@ -202,7 +202,7 @@ export async function POST(request: NextRequest) {
                 user.final_image_url = signedUrl;
                 user.download_url = downloadUrl;
             }
-            console.log('✅ Signed URLs generated successfully');
+            console.log(`✅ Signed URLs generated. Preview starts with: ${signedUrl.substring(0, 50)}...`);
         } catch (s3Error) {
             console.error('❌ Failed to generate signed URLs:', s3Error);
         }
