@@ -218,7 +218,7 @@ BEGIN
   END IF;
   -- Add new constraint
   ALTER TABLE public.generations ADD CONSTRAINT category_format 
-    CHECK (category IN ('Startups', 'Working Professionals', 'Students', 'Business Owners', 'NRI / Gulf Retunees', 'Government Officials'));
+    CHECK (category IN ('Startups', 'Working Professionals', 'Students', 'Business Owners', 'NRI / Gulf Retunees', 'Government Officials', 'Other'));
 END $$;
 
 -- Add prompt_type constraint
@@ -255,7 +255,7 @@ CREATE TABLE IF NOT EXISTS public.generations (
   -- Add constraints
   CONSTRAINT email_format CHECK (email ~* '^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$'),
   CONSTRAINT phone_format CHECK (phone_no ~* '^\+?[0-9]{10,15}$'),
-  CONSTRAINT category_format CHECK (category IN ('Startups', 'Working Professionals', 'Students', 'Business Owners', 'NRI / Gulf Retunees', 'Government Officials')),
+  CONSTRAINT category_format CHECK (category IN ('Startups', 'Working Professionals', 'Students', 'Business Owners', 'NRI / Gulf Retunees', 'Government Officials', 'Other')),
   CONSTRAINT prompt_type_format CHECK (prompt_type IN ('prompt1', 'prompt2', 'prompt3'))
 );
 

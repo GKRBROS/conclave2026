@@ -54,7 +54,7 @@ export async function POST(request: NextRequest) {
             );
         }
 
-        if (!category || typeof category !== 'string' || !ALLOWED_CATEGORIES.includes(category)) {
+        if (!category || typeof category !== 'string' || (!ALLOWED_CATEGORIES.includes(category) && category !== 'Other')) {
             return NextResponse.json(
                 { error: 'Valid category is required' },
                 { status: 400, headers: corsHeaders(origin) }
