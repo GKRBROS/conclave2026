@@ -200,11 +200,26 @@ GET /api/user/[userId]
 
 ### URL Parameters
 
-| Parameter | Type | Required | Description                             |
-| --------- | ---- | -------- | --------------------------------------- |
-| `userId`  | UUID | ✅       | The UUID of the generated avatar record |
+| Parameter | Type   | Required | Description                                                                 |
+| --------- | ------ | -------- | --------------------------------------------------------------------------- |
+| `userId`  | string | ✅       | **Preferred: User's Phone Number** (e.g., `+919876543210`) or Record UUID. |
 
-### Example Request
+> **Note**: Using the phone number for polling is the most reliable method as it ensures you always get the latest generation for that specific user, even if session IDs (UUIDs) are lost or stale.
+
+### Query Parameters
+
+| Parameter   | Type   | Required | Description                                            |
+| ----------- | ------ | -------- | ------------------------------------------------------ |
+| `dial_code` | string | ❌       | Optional dial code (e.g., `+91`) if `userId` is phone. |
+
+### Example Request (Polling by Phone)
+
+```bash
+# Recommended method
+curl -X GET "http://localhost:3000/scaleup2026/user/+919876543210"
+```
+
+### Example Request (Polling by UUID)
 
 ```bash
 curl -X GET "http://localhost:3000/scaleup2026/user/550e8400-e29b-41d4-a716-446655440000"

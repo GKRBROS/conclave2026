@@ -79,10 +79,24 @@ export async function POST(request: NextRequest) {
       console.log(`📱 Normalized phone: ${originalPhone} (dial: ${finalDialCode}) -> ${finalPhone}`);
     }
     
-    // Determine the primary identifier (UUID priority)
-    const isUuid = userIdFromForm && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(userIdFromForm);
-    const lookupId = isUuid ? userIdFromForm : (finalPhone || email);
-    const lookupField = isUuid ? 'id' : (finalPhone ? 'phone_no' : 'email');
+    // Determine the primary identifier (Phone number priority)
+    // We prioritize phone_no/email over userId to prevent mix-ups if a stale userId is passed from the frontend
+    const finalLookupPhone = finalPhone;
+    const finalLookupEmail = email;
+    
+    let lookupId: string | null = null;
+    let lookupField: string = 'id';
+
+    if (finalLookupPhone) {
+      lookupId = finalLookupPhone;
+      lookupField = 'phone_no';
+    } else if (finalLookupEmail) {
+      lookupId = finalLookupEmail;
+      lookupField = 'email';
+    } else if (userIdFromForm && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(userIdFromForm)) {
+      lookupId = userIdFromForm;
+      lookupField = 'id';
+    }
 
     const district = formData.get('district') as string | null;
     const category = formData.get('category') as string | null;

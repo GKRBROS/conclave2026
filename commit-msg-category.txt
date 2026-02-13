@@ -1,6 +1,0 @@
-fix: remove category constraint to allow any string input
-
-- Removed strict category validation in register/route.ts
-- Removed category_format constraint from supabase-setup.sql
-- Added logic to drop existing category constraints in supabase-setup.sql
-- Updated documentation to reflect any category name is accepted

@@ -19,6 +19,10 @@ export async function GET(
 
     const supabase = supabaseAdmin;
     const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(userId);
+    
+    // Determine if the provided userId is a phone number or a UUID
+    // We prioritize phone number lookup as it is more reliable for user-specific sessions
+    let query = supabase.from('generations').select('generated_image_url');
     let normalizedId = userId;
 
     if (!isUuid) {
@@ -38,26 +42,15 @@ export async function GET(
           normalizedId = '+' + cleanDialCode + cleaned;
         }
       }
-      console.log(`📱 Normalized lookup ID: ${userId} (dial: ${dialCode}) -> ${normalizedId}`);
-    }
-
-    const isPhone = /^\+?[0-9]{10,15}$/.test(normalizedId);
-
-    if (!isUuid && !isPhone) {
-      return NextResponse.json(
-        { error: 'Invalid ID or phone number format' },
-        { status: 400, headers: corsHeaders(origin) }
-      );
-    }
-
-    // Fetch only the final generated image URL
-    let query = supabase.from('generations').select('generated_image_url');
-    
-    if (isUuid) {
-      query = query.eq('id', normalizedId);
-    } else {
+      console.log(`📱 Phone lookup: ${userId} -> ${normalizedId}`);
       query = query.eq('phone_no', normalizedId);
+    } else {
+      console.log(`🆔 UUID lookup: ${userId}`);
+      query = query.eq('id', userId);
     }
+
+    // Sort by created_at descending to always get the LATEST generation for this phone/UUID
+    query = query.order('created_at', { ascending: false }).limit(1);
 
     const { data, error } = await query.maybeSingle();
 
