@@ -1,5 +1,0 @@
-fix: prioritize phone lookup over UUID to prevent user image mix-ups
-
-- Modified generate/route.ts to prioritize phone_no/email for record identification, ensuring new generations correctly update the user's existing record based on their identity rather than a potentially stale UUID.
-- Updated user/[userId]/route.ts to prioritize phone-based lookup and added sorting by created_at (DESC) to always return the most recent generation for that user.
-- Updated API_DOCUMENTATION.md to recommend phone-based polling as the most reliable method.

@@ -86,6 +86,7 @@ export async function POST(request: NextRequest) {
     
     let lookupId: string | null = null;
     let lookupField: string = 'id';
+    const isUuid = userIdFromForm && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(userIdFromForm);
 
     if (finalLookupPhone) {
       lookupId = finalLookupPhone;
@@ -93,7 +94,7 @@ export async function POST(request: NextRequest) {
     } else if (finalLookupEmail) {
       lookupId = finalLookupEmail;
       lookupField = 'email';
-    } else if (userIdFromForm && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(userIdFromForm)) {
+    } else if (isUuid) {
       lookupId = userIdFromForm;
       lookupField = 'id';
     }
