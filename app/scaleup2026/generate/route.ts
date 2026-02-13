@@ -605,7 +605,7 @@ export async function POST(request: NextRequest) {
       // We run this async without awaiting to not block the response
       (async () => {
         try {
-          const templatePath = join(process.cwd(), 'send-mail', 'mail.html');
+          const templatePath = join(process.cwd(), 'app', 'api', 'send-mail', 'mail.html');
           let html = await readFile(templatePath, 'utf-8');
           
           html = html.replace(/{{IMAGE_URL}}/g, emailImageUrl);
