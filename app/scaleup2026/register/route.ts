@@ -47,6 +47,9 @@ export async function POST(request: NextRequest) {
             );
         }
 
+        const finalDistrict = district.trim();
+        console.log(`📍 Registering with district: ${finalDistrict}`);
+
         if (!category || typeof category !== 'string' || category.trim().length === 0) {
             return NextResponse.json(
                 { error: 'Category is required' },
@@ -106,14 +109,14 @@ export async function POST(request: NextRequest) {
                     name: name.trim(),
                     email: trimmedEmail,
                     phone_no: trimmedPhone,
-                    district: district.trim(),
+                    district: finalDistrict,
                     category: finalCategory,
                     organization: organization.trim(),
                     prompt_type: 'prompt1', // Default to prompt1 on registration/update
                     updated_at: new Date().toISOString(),
                 })
                 .eq('id', existingUser.id)
-                .select('id, name, organization')
+                .select()
                 .single();
 
             if (updateError) {
@@ -124,24 +127,21 @@ export async function POST(request: NextRequest) {
                 );
             }
 
-            return NextResponse.json(
-                {
-                    success: true,
-                    user_id: updatedUser.id,
-                    name: updatedUser.name,
-                    organization: updatedUser.organization,
-                },
-                { headers: corsHeaders(origin) }
-            );
+            return NextResponse.json({
+                success: true,
+                message: 'User updated successfully',
+                user: updatedUser
+            }, { headers: corsHeaders(origin) });
         }
 
-        const { data, error } = await supabaseAdmin
+        // Create new user if not exists
+        const { data: newUser, error: insertError } = await supabaseAdmin
             .from('generations')
             .insert({
                 name: name.trim(),
                 email: trimmedEmail,
                 phone_no: trimmedPhone,
-                district: district.trim(),
+                district: finalDistrict,
                 category: finalCategory,
                 organization: organization.trim(),
                 prompt_type: 'prompt1', // Default to prompt1 on registration
@@ -149,10 +149,10 @@ export async function POST(request: NextRequest) {
             .select('id, name, organization')
             .single();
 
-        if (error) {
-            console.error('Database insert error:', error);
+        if (insertError) {
+            console.error('Database insert error:', insertError);
             return NextResponse.json(
-                { error: 'Failed to save data', details: error.message },
+                { error: 'Failed to save data', details: insertError.message },
                 { status: 500, headers: corsHeaders(origin) }
             );
         }
@@ -160,9 +160,8 @@ export async function POST(request: NextRequest) {
         return NextResponse.json(
             {
                 success: true,
-                user_id: data.id,
-                name: data.name,
-                organization: data.organization,
+                message: 'User created successfully',
+                user: newUser
             },
             { headers: corsHeaders(origin) }
         );
