@@ -22,7 +22,7 @@ export async function GET(
     
     // Determine if the provided userId is a phone number or a UUID
     // We prioritize phone number lookup as it is more reliable for user-specific sessions
-    let query = supabase.from('generations').select('generated_image_url');
+    let query = supabase.from('generations').select('generated_image_url, aws_key');
     let normalizedId = userId;
 
     if (!isUuid) {
@@ -69,7 +69,7 @@ export async function GET(
       );
     }
 
-    if (!data.generated_image_url) {
+    if (!data.aws_key && !data.generated_image_url) {
       return NextResponse.json(
         {
           error: 'Backend processing',
@@ -84,19 +84,44 @@ export async function GET(
       );
     }
 
-    let finalImageUrl = data.generated_image_url;
+    let finalImageUrl = '';
+    let downloadUrl = '';
+    let aiImageUrl = '';
+
     try {
-      const finalKey = new URL(finalImageUrl).pathname.replace(/^\//, '');
-      finalImageUrl = await S3Service.getPresignedUrl(finalKey, 3600);
+      // 1. Get the ticket (merged image) from aws_key
+      if (data.aws_key) {
+        finalImageUrl = await S3Service.getPresignedUrl(data.aws_key, 604800);
+      }
+
+      // 2. Get the raw AI image from generated_image_url
+      if (data.generated_image_url) {
+        const aiKey = data.generated_image_url;
+        if (aiKey && !aiKey.startsWith('http')) {
+          aiImageUrl = await S3Service.getPresignedUrl(aiKey, 604800);
+          downloadUrl = await S3Service.getDownloadPresignedUrl(aiKey, `scaleup-ai-${normalizedId}.png`, 604800);
+        } else {
+          aiImageUrl = aiKey;
+          downloadUrl = aiKey;
+        }
+      }
+
+      // Fallbacks
+      if (!finalImageUrl) finalImageUrl = aiImageUrl;
+      if (!downloadUrl) downloadUrl = finalImageUrl;
+      if (!aiImageUrl) aiImageUrl = finalImageUrl;
+
     } catch (presignError) {
-      console.warn('Failed to presign final image URL:', presignError);
+      console.warn('Failed to presign images:', presignError);
     }
 
-    // Return only the final image URL
+    // Return all URLs to the frontend
     return NextResponse.json({
       success: true,
       user_id: normalizedId,
       final_image_url: finalImageUrl,
+      generated_image_url: aiImageUrl,
+      download_url: downloadUrl,
     }, {
       headers: {
         ...corsHeaders(origin),

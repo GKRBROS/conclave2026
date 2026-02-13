@@ -305,11 +305,14 @@ export async function POST(request: NextRequest) {
     const finalImagePath = await mergeImages(tempGeneratedFile, timestamp.toString(), name, organization);
 
     let finalImagePresignedUrl = finalImagePath;
+    let finalKey = '';
     try {
-      const finalKey = new URL(finalImagePath).pathname.replace(/^\//, '');
+      finalKey = new URL(finalImagePath).pathname.replace(/^\//, '');
       finalImagePresignedUrl = await S3Service.getPresignedUrl(finalKey, 3600);
     } catch (presignError) {
       console.warn('Failed to presign final image URL:', presignError);
+      // Fallback: if it's not a URL, it might be the key
+      finalKey = finalImagePath.includes('http') ? '' : finalImagePath;
     }
 
     let uploadedImagePresignedUrl = uploadedImageUrl;
@@ -338,17 +341,17 @@ export async function POST(request: NextRequest) {
       if (!searchError && existingUser) {
         // User exists, update their record
         console.log('✓ Found existing user, updating record...');
-        const { data: updateData, error: updateError } = await supabase
-          .from('generations')
-          .update({
-            name: name.trim(),
-            organization: organization.trim(),
-            photo_url: uploadedImageUrl,
-            generated_image_url: finalImagePath,
-            aws_key: generatedKey,
-            prompt_type: prompt_type,
-            updated_at: new Date().toISOString()
-          })
+          const { data: updateData, error: updateError } = await supabase
+            .from('generations')
+            .update({
+              name: name.trim(),
+              organization: organization.trim(),
+              photo_url: uploadedImageUrl,
+              generated_image_url: generatedKey || finalGeneratedUrl, // Store raw AI image key/URL
+              aws_key: finalKey, // Store the final ticket key
+              prompt_type: prompt_type,
+              updated_at: new Date().toISOString()
+            })
           .eq('phone_no', phone_no.trim())
           .select()
           .single();
@@ -368,8 +371,8 @@ export async function POST(request: NextRequest) {
             category: category ? category.trim() : null,
             organization: organization.trim(),
             photo_url: uploadedImageUrl,
-            generated_image_url: finalImagePath,
-            aws_key: generatedKey,
+            generated_image_url: generatedKey || finalGeneratedUrl, // Store raw AI image key/URL
+            aws_key: finalKey, // Store the final ticket key
             prompt_type: prompt_type
           })
           .select()
@@ -391,8 +394,8 @@ export async function POST(request: NextRequest) {
           category: category ? category.trim() : null,
           organization: organization.trim(),
           photo_url: uploadedImageUrl,
-          generated_image_url: finalImagePath,
-          aws_key: generatedKey,
+          generated_image_url: generatedKey || finalGeneratedUrl, // Store raw AI image key/URL
+          aws_key: finalKey, // Store the final ticket key
           prompt_type: prompt_type
         })
         .select()
@@ -412,15 +415,28 @@ export async function POST(request: NextRequest) {
 
     console.log('Saved to database:', dbData);
 
+    // Prepare AI Image Presigned URL for response
+    let aiImagePresignedUrl = finalGeneratedUrl;
+    let downloadUrl = finalImagePresignedUrl;
+    if (generatedKey) {
+      try {
+        aiImagePresignedUrl = await S3Service.getPresignedUrl(generatedKey, 604800);
+        downloadUrl = await S3Service.getDownloadPresignedUrl(generatedKey, `scaleup-ai-${timestamp}.png`, 604800);
+      } catch (e) {
+        console.warn('Failed to presign AI image for response:', e);
+      }
+    }
+
     return NextResponse.json({
       success: true,
       user_id: dbData.id,
       name: dbData.name,
       organization: dbData.organization,
-      aws_key: dbData.aws_key,
+      aws_key: finalKey,
       photo_url: uploadedImagePresignedUrl,
-      generated_image_url: finalImagePresignedUrl,
-      final_image_url: finalImagePresignedUrl
+      generated_image_url: aiImagePresignedUrl,
+      final_image_url: finalImagePresignedUrl,
+      download_url: downloadUrl
     });
   } catch (error: any) {
     console.error('CRITICAL ERROR during generation:', error);

@@ -519,7 +519,7 @@ export async function POST(request: NextRequest) {
           name: name.trim(),
           organization: organization.trim(),
           photo_url: uploadedImageUrl,
-          generated_image_url: finalImagePath,
+          generated_image_url: generatedKey || finalGeneratedUrl, // Store raw AI image key/URL
           aws_key: finalKey, // Use the final merged image key
           prompt_type: prompt_type,
           updated_at: new Date().toISOString()
@@ -543,7 +543,7 @@ export async function POST(request: NextRequest) {
           category: finalCategory,
           organization: organization.trim(),
           photo_url: uploadedImageUrl,
-          generated_image_url: finalImagePath,
+          generated_image_url: generatedKey || finalGeneratedUrl, // Store raw AI image key/URL
           aws_key: finalKey, // Use the final merged image key
           prompt_type: prompt_type
         })
@@ -591,9 +591,22 @@ export async function POST(request: NextRequest) {
 
     // Update the dbData with the presigned URLs for the response
     if (dbData) {
-      dbData.generated_image_url = finalImagePresignedUrl;
+      // Use the raw AI image for generated_image_url and download_url
+      // but keep the final merged image for final_image_url (the ticket)
+      try {
+        const aiKey = dbData.generated_image_url;
+        if (aiKey && !aiKey.startsWith('http')) {
+           dbData.generated_image_url = await S3Service.getPresignedUrl(aiKey, 604800);
+           dbData.download_url = await S3Service.getDownloadPresignedUrl(aiKey, `scaleup-ai-${uniqueId}.png`, 604800);
+        } else {
+           dbData.download_url = finalImageDownloadUrl;
+        }
+      } catch (e) {
+        console.warn('Failed to presign AI image for response:', e);
+        dbData.download_url = finalImageDownloadUrl;
+      }
+      
       dbData.final_image_url = finalImagePresignedUrl;
-      dbData.download_url = finalImageDownloadUrl;
     }
 
     // Step 9: Send Email (Non-blocking)

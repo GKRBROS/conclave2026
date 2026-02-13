@@ -184,25 +184,39 @@ export async function POST(request: NextRequest) {
     if (user && user.aws_key) {
         console.log(`🔄 Generating fresh signed URLs for user: ${user.email}, S3 Key: ${user.aws_key}`);
         try {
-            // Always generate fresh presigned URLs to ensure they haven't expired
-            // user.generated_image_url is the primary preview URL
-            const signedUrl = await S3Service.getPresignedUrl(user.aws_key, 604800, 'image/png'); // 7 days
+            // aws_key is the ticket (merged image)
+            const ticketSignedUrl = await S3Service.getPresignedUrl(user.aws_key, 604800, 'image/png');
             
-            // Generate a separate download URL with attachment disposition
-            const downloadUrl = await S3Service.getDownloadPresignedUrl(
-                user.aws_key, 
-                `scaleup-avatar-${user.id}.png`, 
-                604800, 
-                'image/png'
-            );
+            // generated_image_url now stores the raw AI image key
+            let downloadUrl = ticketSignedUrl; // Fallback
+            let aiImageUrl = ticketSignedUrl; // Fallback
 
-            if (signedUrl) {
-                user.generated_image_url = signedUrl;
-                // Add explicit download and preview fields for the frontend
-                user.final_image_url = signedUrl;
-                user.download_url = downloadUrl;
+            if (user.generated_image_url && !user.generated_image_url.startsWith('http')) {
+                console.log(`🖼️ Generating AI image download URL from key: ${user.generated_image_url}`);
+                aiImageUrl = await S3Service.getPresignedUrl(user.generated_image_url, 604800, 'image/png');
+                downloadUrl = await S3Service.getDownloadPresignedUrl(
+                    user.generated_image_url, 
+                    `scaleup-ai-${user.id}.png`, 
+                    604800, 
+                    'image/png'
+                );
+            } else {
+                console.log(`⚠️ No raw AI image key found, using ticket for download`);
+                downloadUrl = await S3Service.getDownloadPresignedUrl(
+                    user.aws_key, 
+                    `scaleup-ticket-${user.id}.png`, 
+                    604800, 
+                    'image/png'
+                );
             }
-            console.log(`✅ Signed URLs generated. Preview starts with: ${signedUrl.substring(0, 50)}...`);
+
+            user.generated_image_url = aiImageUrl;
+            user.final_image_url = ticketSignedUrl;
+            user.download_url = downloadUrl;
+            
+            console.log(`✅ Signed URLs generated.`);
+            console.log(`   - Ticket (Preview): ${ticketSignedUrl.substring(0, 50)}...`);
+            console.log(`   - AI Image (Download): ${downloadUrl.substring(0, 50)}...`);
         } catch (s3Error) {
             console.error('❌ Failed to generate signed URLs:', s3Error);
         }
