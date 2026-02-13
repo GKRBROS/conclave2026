@@ -23,7 +23,7 @@ export async function POST(request: NextRequest) {
       console.error('❌ Email validation failed:', email);
       return NextResponse.json(
         { error: 'Email is required' },
-        { status: 400, headers: corsHeaders(origin) }
+        { status: 400 }
       );
     }
 
@@ -33,7 +33,7 @@ export async function POST(request: NextRequest) {
       console.error('❌ Email regex validation failed:', trimmedEmail);
       return NextResponse.json(
         { error: 'Invalid email format' },
-        { status: 400, headers: corsHeaders(origin) }
+        { status: 400 }
       );
     }
 
@@ -52,7 +52,7 @@ export async function POST(request: NextRequest) {
        console.error('Database error checking email:', genError);
        return NextResponse.json(
         { error: 'Database error. Please try again.' },
-        { status: 500, headers: corsHeaders(origin) }
+        { status: 500 }
       );
     }
 
@@ -64,7 +64,7 @@ export async function POST(request: NextRequest) {
           redirectTo: 'registration',
           message: 'Please register to generate your avatar.'
         },
-        { status: 404, headers: corsHeaders(origin) }
+        { status: 404 }
       );
     }
 
@@ -109,7 +109,7 @@ export async function POST(request: NextRequest) {
         console.error('Failed to update OTP:', updateError);
         return NextResponse.json(
           { error: 'Failed to update OTP', details: updateError.message },
-          { status: 500, headers: corsHeaders(origin) }
+          { status: 500 }
         );
       }
 
@@ -134,7 +134,7 @@ export async function POST(request: NextRequest) {
         console.error('Failed to insert OTP:', insertError);
         return NextResponse.json(
           { error: 'Failed to generate OTP', details: insertError.message },
-          { status: 500, headers: corsHeaders(origin) }
+          { status: 500 }
         );
       }
 
@@ -180,8 +180,6 @@ export async function POST(request: NextRequest) {
       email: targetEmail,
       otp: otp, // Return OTP so frontend can verify if needed (or debug)
       expires_in_minutes: 10,
-    }, {
-      headers: corsHeaders(origin),
     });
 
   } catch (error: any) {
@@ -191,7 +189,7 @@ export async function POST(request: NextRequest) {
         error: 'Failed to generate OTP',
         details: error?.message || 'Unknown error',
       },
-      { status: 500, headers: corsHeaders(origin) }
+      { status: 500 }
     );
   }
 }

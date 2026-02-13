@@ -421,10 +421,15 @@ export async function POST(request: NextRequest) {
     if (generatedKey) {
       try {
         aiImagePresignedUrl = await S3Service.getPresignedUrl(generatedKey, 604800);
+        // FIX: Use generatedKey (AI image) for downloadUrl instead of finalKey (ticket)
         downloadUrl = await S3Service.getDownloadPresignedUrl(generatedKey, `scaleup-ai-${timestamp}.png`, 604800);
       } catch (e) {
         console.warn('Failed to presign AI image for response:', e);
       }
+    } else if (finalGeneratedUrl.startsWith('http')) {
+        // If we have a URL but no key, use it for both
+        aiImagePresignedUrl = finalGeneratedUrl;
+        downloadUrl = finalGeneratedUrl;
     }
 
     return NextResponse.json({

@@ -597,8 +597,14 @@ export async function POST(request: NextRequest) {
         const aiKey = dbData.generated_image_url;
         if (aiKey && !aiKey.startsWith('http')) {
            dbData.generated_image_url = await S3Service.getPresignedUrl(aiKey, 604800);
+           // FIX: Ensure download_url uses the raw AI image key (aiKey)
            dbData.download_url = await S3Service.getDownloadPresignedUrl(aiKey, `scaleup-ai-${uniqueId}.png`, 604800);
+        } else if (aiKey && aiKey.startsWith('http')) {
+           // If it's already a URL, use it
+           dbData.generated_image_url = aiKey;
+           dbData.download_url = aiKey;
         } else {
+           // Fallback to final image if no AI image is found
            dbData.download_url = finalImageDownloadUrl;
         }
       } catch (e) {
@@ -669,9 +675,9 @@ export async function POST(request: NextRequest) {
         organization: dbData.organization,
         aws_key: dbData.aws_key,
         photo_url: uploadedImagePresignedUrl,
-        generated_image_url: finalImagePresignedUrl,
+        generated_image_url: dbData.generated_image_url || finalImagePresignedUrl,
         final_image_url: finalImagePresignedUrl,
-        download_url: finalImageDownloadUrl
+        download_url: dbData.download_url || finalImageDownloadUrl
       },
       {
         status: 200

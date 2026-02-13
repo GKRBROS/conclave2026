@@ -29,21 +29,21 @@ export async function POST(request: NextRequest) {
         if (!email || typeof email !== 'string' || !EMAIL_REGEX.test(email)) {
             return NextResponse.json(
                 { error: 'Valid email is required' },
-                { status: 400, headers: corsHeaders(origin) }
+                { status: 400 }
             );
         }
 
         if (!finalPhoneBase || typeof finalPhoneBase !== 'string' || !PHONE_REGEX.test(finalPhoneBase)) {
             return NextResponse.json(
                 { error: 'Valid phone number is required (10-15 digits)' },
-                { status: 400, headers: corsHeaders(origin) }
+                { status: 400 }
             );
         }
 
         if (!district || typeof district !== 'string' || district.trim().length === 0) {
             return NextResponse.json(
                 { error: 'District is required' },
-                { status: 400, headers: corsHeaders(origin) }
+                { status: 400 }
             );
         }
 
@@ -53,7 +53,7 @@ export async function POST(request: NextRequest) {
         if (!category || typeof category !== 'string' || category.trim().length === 0) {
             return NextResponse.json(
                 { error: 'Category is required' },
-                { status: 400, headers: corsHeaders(origin) }
+                { status: 400 }
             );
         }
 
@@ -64,7 +64,7 @@ export async function POST(request: NextRequest) {
         if (!organization || typeof organization !== 'string' || organization.trim().length === 0) {
             return NextResponse.json(
                 { error: 'Organization is required' },
-                { status: 400, headers: corsHeaders(origin) }
+                { status: 400 }
             );
         }
 
@@ -98,7 +98,7 @@ export async function POST(request: NextRequest) {
             console.error('Database lookup error:', existingError);
             return NextResponse.json(
                 { error: 'Failed to lookup user', details: existingError.message },
-                { status: 500, headers: corsHeaders(origin) }
+                { status: 500 }
             );
         }
 
@@ -123,7 +123,7 @@ export async function POST(request: NextRequest) {
                 console.error('Database update error:', updateError);
                 return NextResponse.json(
                     { error: 'Failed to update user', details: updateError.message },
-                    { status: 500, headers: corsHeaders(origin) }
+                    { status: 500 }
                 );
             }
 
@@ -131,7 +131,7 @@ export async function POST(request: NextRequest) {
                 success: true,
                 message: 'User updated successfully',
                 user: updatedUser
-            }, { headers: corsHeaders(origin) });
+            });
         }
 
         // Create new user if not exists
@@ -153,7 +153,7 @@ export async function POST(request: NextRequest) {
             console.error('Database insert error:', insertError);
             return NextResponse.json(
                 { error: 'Failed to save data', details: insertError.message },
-                { status: 500, headers: corsHeaders(origin) }
+                { status: 500 }
             );
         }
 
@@ -162,14 +162,13 @@ export async function POST(request: NextRequest) {
                 success: true,
                 message: 'User created successfully',
                 user: newUser
-            },
-            { headers: corsHeaders(origin) }
+            }
         );
     } catch (error: any) {
         console.error('Error saving registration:', error);
         return NextResponse.json(
             { error: 'Failed to save data', details: error?.message || 'Unknown error' },
-            { status: 500, headers: corsHeaders(origin) }
+            { status: 500 }
         );
     }
 }

@@ -52,7 +52,7 @@ export async function POST(request: NextRequest) {
        console.error('Database error fetching verification:', fetchError);
        return NextResponse.json(
         { error: 'Database error. Please try again.' },
-        { status: 500, headers: corsHeaders(origin) }
+        { status: 500 }
       );
     }
 
@@ -60,7 +60,7 @@ export async function POST(request: NextRequest) {
       console.warn(`Verification record not found for: "${trimmedEmail}"`);
       return NextResponse.json(
         { error: 'No OTP found for this email address. Please request a new OTP.' },
-        { status: 404, headers: corsHeaders(origin) }
+        { status: 404 }
       );
     }
     
@@ -85,7 +85,7 @@ export async function POST(request: NextRequest) {
           error: 'OTP has expired. Please request a new OTP.',
           expired_at: verificationData.expires_at,
         },
-        { status: 400, headers: corsHeaders(origin) }
+        { status: 400 }
       );
     }
 
@@ -104,7 +104,7 @@ export async function POST(request: NextRequest) {
           error: 'Email already verified. Please request a new OTP to verify again.',
           verified_at: verificationData.verified_at,
         },
-        { status: 409, headers: corsHeaders(origin) }
+        { status: 409 }
       );
     }
 
@@ -116,7 +116,7 @@ export async function POST(request: NextRequest) {
           error: 'Too many failed attempts. Please request a new OTP.',
           max_attempts: MAX_ATTEMPTS,
         },
-        { status: 429, headers: corsHeaders(origin) }
+        { status: 429 }
       );
     }
 
@@ -137,7 +137,7 @@ export async function POST(request: NextRequest) {
           error: 'Invalid OTP',
           attempts_remaining: MAX_ATTEMPTS - newAttempts,
         },
-        { status: 400, headers: corsHeaders(origin) }
+        { status: 400 }
       );
     }
 
@@ -159,7 +159,7 @@ export async function POST(request: NextRequest) {
       console.error('Failed to update verification status:', updateError);
       return NextResponse.json(
         { error: 'Failed to update verification status' },
-        { status: 500, headers: corsHeaders(origin) }
+        { status: 500 }
       );
     }
 
@@ -233,8 +233,6 @@ export async function POST(request: NextRequest) {
       user: user,
       redirectTo: redirectTo,
       image_url: user?.generated_image_url || null, // Top-level for convenience
-    }, {
-      headers: corsHeaders(origin),
     });
 
   } catch (error: any) {
@@ -244,7 +242,7 @@ export async function POST(request: NextRequest) {
         error: 'Failed to verify OTP',
         details: error?.message || 'Unknown error',
       },
-      { status: 500, headers: corsHeaders(origin) }
+      { status: 500 }
     );
   }
 }

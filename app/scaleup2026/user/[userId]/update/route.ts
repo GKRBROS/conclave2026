@@ -68,8 +68,6 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
         organization: data.organization,
         updated_at: data.updated_at,
       },
-    }, {
-      headers: corsHeaders(origin),
     });
 
   } catch (error: any) {

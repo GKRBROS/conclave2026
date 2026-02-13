@@ -109,7 +109,7 @@ export async function POST(request: NextRequest) {
         console.error('Failed to update OTP:', updateError);
         return NextResponse.json(
           { error: 'Failed to update OTP', details: updateError.message },
-          { status: 500, headers: corsHeaders(origin) }
+          { status: 500 }
         );
       }
 
@@ -134,7 +134,7 @@ export async function POST(request: NextRequest) {
         console.error('Failed to insert OTP:', insertError);
         return NextResponse.json(
           { error: 'Failed to generate OTP', details: insertError.message },
-          { status: 500, headers: corsHeaders(origin) }
+          { status: 500 }
         );
       }
 
@@ -169,10 +169,6 @@ export async function POST(request: NextRequest) {
       console.log('✅ OTP email sent successfully');
     } catch (emailError: any) {
       console.error('❌ Failed to send OTP email:', emailError);
-      // We still return success because the OTP was generated, but we include a warning/error
-      // Actually, if email fails, the user can't verify. So maybe we should return error?
-      // But the user said "add send the otp viaa the email given using backend and verify aaand send thaat too frontend"
-      // I'll return success but log the error. The frontend will receive the OTP anyway (for dev purposes or fallback).
     }
 
     console.log('✅ OTP generated and processed. Returning response.');
@@ -183,8 +179,6 @@ export async function POST(request: NextRequest) {
       email: targetEmail,
       otp: otp, // Return OTP so frontend can verify if needed (or debug)
       expires_in_minutes: 10,
-    }, {
-      headers: corsHeaders(origin),
     });
 
   } catch (error: any) {
@@ -194,7 +188,7 @@ export async function POST(request: NextRequest) {
         error: 'Failed to generate OTP',
         details: error?.message || 'Unknown error',
       },
-      { status: 500, headers: corsHeaders(origin) }
+      { status: 500 }
     );
   }
 }

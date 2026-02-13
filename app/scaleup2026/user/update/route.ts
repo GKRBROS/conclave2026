@@ -17,21 +17,21 @@ export async function PUT(request: NextRequest) {
         if (!phone_no || typeof phone_no !== 'string' || !PHONE_REGEX.test(phone_no)) {
             return NextResponse.json(
                 { error: 'Valid phone number is required (10-15 digits)' },
-                { status: 400, headers: corsHeaders(origin) }
+                { status: 400 }
             );
         }
 
         if (!name || typeof name !== 'string' || name.trim().length === 0) {
             return NextResponse.json(
                 { error: 'Valid name is required' },
-                { status: 400, headers: corsHeaders(origin) }
+                { status: 400 }
             );
         }
 
         if (!organization || typeof organization !== 'string' || organization.trim().length === 0) {
             return NextResponse.json(
                 { error: 'Valid organization is required' },
-                { status: 400, headers: corsHeaders(origin) }
+                { status: 400 }
             );
         }
 
@@ -50,14 +50,14 @@ export async function PUT(request: NextRequest) {
             console.error('Failed to update user:', error);
             return NextResponse.json(
                 { error: 'Failed to update user details', details: error.message },
-                { status: 500, headers: corsHeaders(origin) }
+                { status: 500 }
             );
         }
 
         if (!data) {
             return NextResponse.json(
                 { error: 'User not found' },
-                { status: 404, headers: corsHeaders(origin) }
+                { status: 404 }
             );
         }
 
@@ -70,8 +70,6 @@ export async function PUT(request: NextRequest) {
                 organization: data.organization,
                 updated_at: data.updated_at,
             },
-        }, {
-            headers: corsHeaders(origin),
         });
     } catch (error: any) {
         console.error('Error updating user:', error);
@@ -80,7 +78,7 @@ export async function PUT(request: NextRequest) {
                 error: 'Failed to update user details',
                 details: error?.message || 'Unknown error',
             },
-            { status: 500, headers: corsHeaders(origin) }
+            { status: 500 }
         );
     }
 }
