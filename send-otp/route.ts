@@ -12,8 +12,6 @@
         // Load HTML template
         const templatePath = path.join(
           process.cwd(),
-          "app",
-          "api",
           "send-otp",
           "mail.html"
         );

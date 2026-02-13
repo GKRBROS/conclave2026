@@ -12,15 +12,14 @@ export async function POST(req: Request) {
     // Load HTML template
     const templatePath = path.join(
       process.cwd(),
-      "app",
-      "api",
       "send-mail",
       "mail.html"
     );
     let html = fs.readFileSync(templatePath, "utf-8");
 
-    // Replace placeholder
-    html = html.replace("{{DOWNLOAD_URL}}", finalImageUrl);
+    // Replace placeholders
+    html = html.replace(/{{IMAGE_URL}}/g, finalImageUrl);
+    html = html.replace(/{{DOWNLOAD_URL}}/g, finalImageUrl);
 
     const transporter = nodemailer.createTransport({
       host: process.env.SMTP_HOST_NAME,
