@@ -126,21 +126,21 @@ export async function POST(request: NextRequest) {
     if (!image) {
       return NextResponse.json(
         { error: 'Photo is required' },
-        { status: 400 }
+        { status: 400, headers: corsHeaders(origin) }
       );
     }
 
     if (!name || name.trim().length === 0) {
       return NextResponse.json(
         { error: 'Name is required' },
-        { status: 400 }
+        { status: 400, headers: corsHeaders(origin) }
       );
     }
 
     if (!organization || organization.trim().length === 0) {
       return NextResponse.json(
         { error: 'Organization is required' },
-        { status: 400 }
+        { status: 400, headers: corsHeaders(origin) }
       );
     }
 
@@ -154,7 +154,7 @@ export async function POST(request: NextRequest) {
           error: 'Invalid image format',
           details: `Only JPEG/JPG and PNG formats are allowed. Received: ${image.type}`
         },
-        { status: 400 }
+        { status: 400, headers: corsHeaders(origin) }
       );
     }
 
@@ -165,7 +165,7 @@ export async function POST(request: NextRequest) {
           error: 'Image file too large',
           details: `Maximum file size is 2MB. Current size: ${(image.size / 1024 / 1024).toFixed(2)}MB`
         },
-        { status: 400 }
+        { status: 400, headers: corsHeaders(origin) }
       );
     }
 
@@ -275,7 +275,7 @@ export async function POST(request: NextRequest) {
       console.error('❌ S3 upload error:', s3Error);
       return NextResponse.json(
         { error: 'Failed to upload image to S3' },
-        { status: 500 }
+        { status: 500, headers: corsHeaders(origin) }
       );
     }
 
@@ -474,7 +474,7 @@ export async function POST(request: NextRequest) {
     // Search for existing user by prioritized ID (UUID > Phone > Email)
     let existingUser = null;
     
-    if (isUuid) {
+    if (isUuid && lookupId) {
       console.log(`🆔 Searching for existing user with UUID: ${lookupId}`);
       const { data } = await supabase
         .from('generations')
@@ -570,7 +570,7 @@ export async function POST(request: NextRequest) {
       const whatsappImageUrl = finalImagePresignedUrl;
 
       // Extract the numeric phone number for WhatsApp service
-      const numericPhone = finalPhone.replace(/\D/g, '');
+      const numericPhone = finalPhone!.replace(/\D/g, '');
       console.log(`📱 Sending to numeric phone: ${numericPhone}`);
 
       WhatsappService.sendImage(numericPhone, whatsappImageUrl).then(res => {
@@ -634,19 +634,24 @@ export async function POST(request: NextRequest) {
       })();
     }
 
-    return NextResponse.json({
-      success: true,
-      user_id: dbData.id,
-      name: dbData.name,
-      organization: dbData.organization,
-      aws_key: dbData.aws_key,
-      photo_url: uploadedImagePresignedUrl,
-      generated_image_url: finalImagePresignedUrl,
-      final_image_url: finalImagePresignedUrl,
-      download_url: finalImageDownloadUrl
-    }, {
-      headers: corsHeaders(origin),
-    });
+    // Final success response with CORS
+    return NextResponse.json(
+      {
+        success: true,
+        user_id: dbData.id,
+        name: dbData.name,
+        organization: dbData.organization,
+        aws_key: dbData.aws_key,
+        photo_url: uploadedImagePresignedUrl,
+        generated_image_url: finalImagePresignedUrl,
+        final_image_url: finalImagePresignedUrl,
+        download_url: finalImageDownloadUrl
+      },
+      {
+        status: 200,
+        headers: corsHeaders(origin)
+      }
+    );
   } catch (error: any) {
     console.error('CRITICAL ERROR during generation:', error);
     // Log stack trace for Vercel logs
