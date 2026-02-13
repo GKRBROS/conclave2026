@@ -54,6 +54,10 @@ export async function POST(request: NextRequest) {
             );
         }
 
+        // Handle "Other" category from frontend if it's passed as a string or if we need to map it
+        const finalCategory = category.trim();
+        console.log(`🏷️ Registering with category: ${finalCategory}`);
+
         if (!organization || typeof organization !== 'string' || organization.trim().length === 0) {
             return NextResponse.json(
                 { error: 'Organization is required' },
@@ -103,7 +107,7 @@ export async function POST(request: NextRequest) {
                     email: trimmedEmail,
                     phone_no: trimmedPhone,
                     district: district.trim(),
-                    category: category.trim(),
+                    category: finalCategory,
                     organization: organization.trim(),
                     prompt_type: 'prompt1', // Default to prompt1 on registration/update
                     updated_at: new Date().toISOString(),
@@ -138,7 +142,7 @@ export async function POST(request: NextRequest) {
                 email: trimmedEmail,
                 phone_no: trimmedPhone,
                 district: district.trim(),
-                category: category.trim(),
+                category: finalCategory,
                 organization: organization.trim(),
                 prompt_type: 'prompt1', // Default to prompt1 on registration
             })

@@ -171,8 +171,11 @@ export async function POST(request: NextRequest) {
 
     // Fix: If district is missing, default to 'General'
     const finalDistrict = (district && district.trim().length > 0) ? district.trim() : 'General';
-    // Fix: If category is missing, default to 'Startups' (valid category for constraint)
-    const finalCategory = (category && category.trim().length > 0) ? category.trim() : 'Startups';
+    // Fix: If category is missing or "Other", we ensure it has a value
+    let finalCategory = (category && category.trim().length > 0) ? category.trim() : 'Startups';
+    
+    // Log the category being used
+    console.log(`🏷️ Using category: ${finalCategory}`);
 
     // ============================================
     // STEP 1.5: IMMEDIATELY CLEAR STALE IMAGE DATA
