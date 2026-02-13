@@ -19,21 +19,21 @@ export async function POST(request: NextRequest) {
     if (!email || typeof email !== 'string') {
       return NextResponse.json(
         { error: 'Email is required' },
-        { status: 400, headers: corsHeaders(origin) }
+        { status: 400 }
       );
     }
 
     if (!otp || typeof otp !== 'string') {
       return NextResponse.json(
         { error: 'OTP is required' },
-        { status: 400, headers: corsHeaders(origin) }
+        { status: 400 }
       );
     }
 
     if (otp.length !== 6 || !/^\d{6}$/.test(otp)) {
       return NextResponse.json(
         { error: 'Invalid OTP format. Must be 6 digits.' },
-        { status: 400, headers: corsHeaders(origin) }
+        { status: 400 }
       );
     }
 

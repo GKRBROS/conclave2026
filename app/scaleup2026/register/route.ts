@@ -22,7 +22,7 @@ export async function POST(request: NextRequest) {
         if (!name || typeof name !== 'string' || name.trim().length === 0) {
             return NextResponse.json(
                 { error: 'Name is required' },
-                { status: 400, headers: corsHeaders(origin) }
+                { status: 400 }
             );
         }
 

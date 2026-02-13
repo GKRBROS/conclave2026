@@ -36,7 +36,6 @@ const PROMPTS = {
 };
 
 export async function POST(request: NextRequest) {
-  const origin = request.headers.get('origin') || undefined;
   const isProduction = process.env.NODE_ENV === 'production';
   let dbData: any = null;
   let dbError: any = null;
@@ -104,10 +103,15 @@ export async function POST(request: NextRequest) {
     const organization = formData.get('organization') as string;
     let prompt_type = formData.get('prompt_type') as string;
 
+    const finalDistrict = district?.trim() || 'General';
+    const finalCategory = category?.trim() || 'Startups';
+
     console.log('Input data:', { 
       name, 
       email, 
       finalPhone, 
+      finalDistrict,
+      finalCategory,
       organization, 
       prompt_type,
       imageName: image?.name,
@@ -126,21 +130,21 @@ export async function POST(request: NextRequest) {
     if (!image) {
       return NextResponse.json(
         { error: 'Photo is required' },
-        { status: 400, headers: corsHeaders(origin) }
+        { status: 400 }
       );
     }
 
     if (!name || name.trim().length === 0) {
       return NextResponse.json(
         { error: 'Name is required' },
-        { status: 400, headers: corsHeaders(origin) }
+        { status: 400 }
       );
     }
 
     if (!organization || organization.trim().length === 0) {
       return NextResponse.json(
         { error: 'Organization is required' },
-        { status: 400, headers: corsHeaders(origin) }
+        { status: 400 }
       );
     }
 
@@ -154,7 +158,7 @@ export async function POST(request: NextRequest) {
           error: 'Invalid image format',
           details: `Only JPEG/JPG and PNG formats are allowed. Received: ${image.type}`
         },
-        { status: 400, headers: corsHeaders(origin) }
+        { status: 400 }
       );
     }
 
@@ -165,15 +169,10 @@ export async function POST(request: NextRequest) {
           error: 'Image file too large',
           details: `Maximum file size is 2MB. Current size: ${(image.size / 1024 / 1024).toFixed(2)}MB`
         },
-        { status: 400, headers: corsHeaders(origin) }
+        { status: 400 }
       );
     }
 
-    // Fix: If district is missing, default to 'General'
-    const finalDistrict = (district && district.trim().length > 0) ? district.trim() : 'General';
-    // Fix: If category is missing or "Other", we ensure it has a value
-    let finalCategory = (category && category.trim().length > 0) ? category.trim() : 'Startups';
-    
     // Log the category being used
     console.log(`🏷️ Using category: ${finalCategory}`);
 
@@ -204,6 +203,7 @@ export async function POST(request: NextRequest) {
     }
 
     console.log('--- PROCESSING START ---');
+    console.time('Full_Generation_Process');
     console.log('Step 2: Preparing image buffer');
     // Proceed with processing
     const bytes = await image.arrayBuffer();
@@ -275,7 +275,7 @@ export async function POST(request: NextRequest) {
       console.error('❌ S3 upload error:', s3Error);
       return NextResponse.json(
         { error: 'Failed to upload image to S3' },
-        { status: 500, headers: corsHeaders(origin) }
+        { status: 500 }
       );
     }
 
@@ -306,31 +306,37 @@ export async function POST(request: NextRequest) {
     console.log('Step 7: Sending request to OpenRouter...');
     console.log('  Model:', 'sourceful/riverflow-v2-fast-preview');
     
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 120000); // 120 second timeout for AI call
+
     console.time('OpenRouter_AI_Call');
     const apiResponse = await fetch('https://openrouter.ai/api/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${apiKey}`,
-        'Content-Type': 'application/json',
-        'HTTP-Referer': 'https://github.com/GKRBROS/conclave2026',
-        'X-Title': 'ScaleUp Conclave 2026',
-      },
-      body: JSON.stringify({
-        model: 'sourceful/riverflow-v2-fast-preview',
-        messages: [
-          {
-            role: 'user',
-            content: [
-              { type: 'text', text: prompt },
-              { type: 'image_url', image_url: { url: dataUrl } }
-            ],
-          },
-        ],
-        modalities: ['image']
-      }),
-    });
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${apiKey}`,
+          'Content-Type': 'application/json',
+          'HTTP-Referer': 'https://github.com/GKRBROS/conclave2026',
+          'X-Title': 'ScaleUp Conclave 2026',
+        },
+        signal: controller.signal,
+        body: JSON.stringify({
+          model: 'sourceful/riverflow-v2-fast-preview',
+          messages: [
+            {
+              role: 'user',
+              content: [
+                { type: 'text', text: prompt },
+                { type: 'image_url', image_url: { url: dataUrl } }
+              ],
+            },
+          ],
+          modalities: ['image']
+        }),
+      });
 
-    if (!apiResponse.ok) {
+      clearTimeout(timeoutId);
+
+      if (!apiResponse.ok) {
       console.timeEnd('OpenRouter_AI_Call');
       const status = apiResponse.status;
       const statusText = apiResponse.statusText;
@@ -553,8 +559,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         { error: 'Failed to save to database', details: dbError.message },
         {
-          status: 500,
-          headers: corsHeaders(origin),
+          status: 500
         }
       );
     }
@@ -635,6 +640,14 @@ export async function POST(request: NextRequest) {
     }
 
     // Final success response with CORS
+    if (!dbData) {
+      console.timeEnd('Full_Generation_Process');
+      throw new Error('Database operation failed to return data');
+    }
+
+    console.log('✅ Generation process complete, sending response');
+    console.timeEnd('Full_Generation_Process');
+
     return NextResponse.json(
       {
         success: true,
@@ -648,11 +661,11 @@ export async function POST(request: NextRequest) {
         download_url: finalImageDownloadUrl
       },
       {
-        status: 200,
-        headers: corsHeaders(origin)
+        status: 200
       }
     );
   } catch (error: any) {
+    console.timeEnd('Full_Generation_Process');
     console.error('CRITICAL ERROR during generation:', error);
     // Log stack trace for Vercel logs
     if (error.stack) console.error(error.stack);
@@ -663,8 +676,7 @@ export async function POST(request: NextRequest) {
         details: isProduction ? undefined : error?.stack
       },
       {
-        status: 500,
-        headers: corsHeaders(origin),
+        status: 500
       }
     );
   }

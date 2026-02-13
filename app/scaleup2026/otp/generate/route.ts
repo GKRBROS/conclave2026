@@ -23,7 +23,7 @@ export async function POST(request: NextRequest) {
       console.error('❌ Email validation failed:', email);
       return NextResponse.json(
         { error: 'Email is required' },
-        { status: 400, headers: corsHeaders(origin) }
+        { status: 400 }
       );
     }
 
@@ -33,7 +33,7 @@ export async function POST(request: NextRequest) {
       console.error('❌ Email regex validation failed:', trimmedEmail);
       return NextResponse.json(
         { error: 'Invalid email format' },
-        { status: 400, headers: corsHeaders(origin) }
+        { status: 400 }
       );
     }
 
@@ -52,7 +52,7 @@ export async function POST(request: NextRequest) {
        console.error('Database error checking email:', genError);
        return NextResponse.json(
         { error: 'Database error. Please try again.' },
-        { status: 500, headers: corsHeaders(origin) }
+        { status: 500 }
       );
     }
 
@@ -64,7 +64,7 @@ export async function POST(request: NextRequest) {
           redirectTo: 'registration',
           message: 'Please register to generate your avatar.'
         },
-        { status: 404, headers: corsHeaders(origin) }
+        { status: 404 }
       );
     }
 

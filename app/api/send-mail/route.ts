@@ -17,6 +17,10 @@ export async function POST(req: Request) {
       "send-mail",
       "mail.html"
     );
+    if (!fs.existsSync(templatePath)) {
+      console.error("Template not found at:", templatePath);
+      throw new Error("Email template not found");
+    }
     let html = fs.readFileSync(templatePath, "utf-8");
 
     // Replace placeholders

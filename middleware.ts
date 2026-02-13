@@ -5,18 +5,26 @@ export function middleware(request: NextRequest) {
     const origin = request.headers.get('origin') || undefined;
     const headers = corsHeaders(origin);
 
+    // Handle preflight requests
     if (request.method === 'OPTIONS') {
-        return new NextResponse(null, { status: 200, headers });
+        return new NextResponse(null, { 
+            status: 204, // 204 No Content is better for OPTIONS
+            headers 
+        });
     }
 
     const response = NextResponse.next();
-    for (const [key, value] of Object.entries(headers)) {
-        response.headers.set(key, value);
-    }
+    
+    // Set headers on the response if not already present
+    Object.entries(headers).forEach(([key, value]) => {
+        if (!response.headers.has(key)) {
+            response.headers.set(key, value);
+        }
+    });
 
     return response;
 }
 
 export const config = {
-    matcher: ['/scaleup2026/:path*'],
+    matcher: ['/scaleup2026/:path*', '/api/:path*'],
 };

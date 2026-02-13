@@ -58,14 +58,14 @@ export async function GET(
       console.error('Database query error:', error);
       return NextResponse.json(
         { error: 'Database error', details: error.message },
-        { status: 500, headers: corsHeaders(origin) }
+        { status: 500 }
       );
     }
 
     if (!data) {
       return NextResponse.json(
         { error: 'User not found' },
-        { status: 404, headers: corsHeaders(origin) }
+        { status: 404 }
       );
     }
 
@@ -77,7 +77,6 @@ export async function GET(
           status: 504
         },
         { status: 202, headers: {
-          ...corsHeaders(origin),
           'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
           'Pragma': 'no-cache',
           'Expires': '0'
