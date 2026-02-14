@@ -19,21 +19,21 @@ export async function POST(request: NextRequest) {
     if (!email || typeof email !== 'string') {
       return NextResponse.json(
         { error: 'Email is required' },
-        { status: 400 }
+        { status: 400, headers: corsHeaders(origin) }
       );
     }
 
     if (!otp || typeof otp !== 'string') {
       return NextResponse.json(
         { error: 'OTP is required' },
-        { status: 400 }
+        { status: 400, headers: corsHeaders(origin) }
       );
     }
 
     if (otp.length !== 6 || !/^\d{6}$/.test(otp)) {
       return NextResponse.json(
         { error: 'Invalid OTP format. Must be 6 digits.' },
-        { status: 400 }
+        { status: 400, headers: corsHeaders(origin) }
       );
     }
 
@@ -52,7 +52,7 @@ export async function POST(request: NextRequest) {
        console.error('Database error fetching verification:', fetchError);
        return NextResponse.json(
         { error: 'Database error. Please try again.' },
-        { status: 500 }
+        { status: 500, headers: corsHeaders(origin) }
       );
     }
 
@@ -60,7 +60,7 @@ export async function POST(request: NextRequest) {
       console.warn(`Verification record not found for: "${trimmedEmail}"`);
       return NextResponse.json(
         { error: 'No OTP found for this email address. Please request a new OTP.' },
-        { status: 404 }
+        { status: 404, headers: corsHeaders(origin) }
       );
     }
     
@@ -85,7 +85,7 @@ export async function POST(request: NextRequest) {
           error: 'OTP has expired. Please request a new OTP.',
           expired_at: verificationData.expires_at,
         },
-        { status: 400 }
+        { status: 400, headers: corsHeaders(origin) }
       );
     }
 
@@ -104,7 +104,7 @@ export async function POST(request: NextRequest) {
           error: 'Email already verified. Please request a new OTP to verify again.',
           verified_at: verificationData.verified_at,
         },
-        { status: 409 }
+        { status: 409, headers: corsHeaders(origin) }
       );
     }
 
@@ -116,7 +116,7 @@ export async function POST(request: NextRequest) {
           error: 'Too many failed attempts. Please request a new OTP.',
           max_attempts: MAX_ATTEMPTS,
         },
-        { status: 429 }
+        { status: 429, headers: corsHeaders(origin) }
       );
     }
 
@@ -134,7 +134,7 @@ export async function POST(request: NextRequest) {
 
       return NextResponse.json(
         { error: 'Invalid OTP. Please try again.' },
-        { status: 400 }
+        { status: 400, headers: corsHeaders(origin) }
       );
     }
 
@@ -153,7 +153,7 @@ export async function POST(request: NextRequest) {
       console.error('Failed to mark OTP as verified:', updateError);
       return NextResponse.json(
         { error: 'Failed to verify OTP' },
-        { status: 500 }
+        { status: 500, headers: corsHeaders(origin) }
       );
     }
 
@@ -171,7 +171,7 @@ export async function POST(request: NextRequest) {
         success: true,
         message: 'OTP verified successfully',
         verified_at: new Date().toISOString(),
-      });
+      }, { headers: corsHeaders(origin) });
     }
 
     // Check if image URL needs to be signed
@@ -220,7 +220,7 @@ export async function POST(request: NextRequest) {
       verified_at: new Date().toISOString(),
       user: user,
       redirectTo: redirectTo,
-    });
+    }, { headers: corsHeaders(origin) });
 
   } catch (error: any) {
     console.error('❌ Error verifying OTP:', error);
@@ -229,7 +229,7 @@ export async function POST(request: NextRequest) {
         error: 'Failed to verify OTP',
         details: error?.message || 'Unknown error',
       },
-      { status: 500 }
+      { status: 500, headers: corsHeaders(origin) }
     );
   }
 }

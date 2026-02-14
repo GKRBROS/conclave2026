@@ -43,6 +43,8 @@ export async function POST(request: NextRequest) {
     // Use admin client for database operations
     const supabase = supabaseAdmin;
 
+    const origin = request.headers.get('origin') || undefined;
+    
     // Step 1: Parse and Validate Form Data
     console.log('--- GENERATION START ---');
     const formData = await request.formData();
@@ -561,7 +563,8 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         { error: 'Failed to save to database', details: dbError.message },
         {
-          status: 500
+          status: 500,
+          headers: corsHeaders(origin)
         }
       );
     }
@@ -680,7 +683,8 @@ export async function POST(request: NextRequest) {
         download_url: dbData.download_url || finalImageDownloadUrl
       },
       {
-        status: 200
+        status: 200,
+        headers: corsHeaders(origin)
       }
     );
   } catch (error: any) {
@@ -695,7 +699,8 @@ export async function POST(request: NextRequest) {
         details: isProduction ? undefined : error?.stack
       },
       {
-        status: 500
+        status: 500,
+        headers: corsHeaders(request.headers.get('origin') || undefined)
       }
     );
   }

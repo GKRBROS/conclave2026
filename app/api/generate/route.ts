@@ -4,10 +4,15 @@ import { join } from 'path';
 import { mergeImages } from '@/lib/imageProcessor';
 import { supabaseAdmin } from '@/lib/supabase/admin';
 import { S3Service } from '@/lib/s3Service';
+import { corsHeaders, handleCorsOptions } from '@/lib/cors';
 import OpenAI from 'openai';
 import sharp from 'sharp';
 
 export const maxDuration = 600; // Increase timeout for long AI generation
+
+export async function OPTIONS(request: NextRequest) {
+  return handleCorsOptions(request);
+}
 
 // 3 AI prompts for image generation
 const PROMPTS = {
@@ -28,6 +33,7 @@ const ALLOWED_IMAGE_FORMATS = ['image/jpeg', 'image/jpg', 'image/png']; // Suppo
 // ============================================
 
 export async function POST(request: NextRequest) {
+  const origin = request.headers.get('origin') || undefined;
   const isProduction = process.env.NODE_ENV === 'production';
   try {
     // Use admin client for database operations
@@ -47,21 +53,21 @@ export async function POST(request: NextRequest) {
     if (!image) {
       return NextResponse.json(
         { error: 'Photo is required' },
-        { status: 400 }
+        { status: 400, headers: corsHeaders(origin) }
       );
     }
 
     if (!name || name.trim().length === 0) {
       return NextResponse.json(
         { error: 'Name is required' },
-        { status: 400 }
+        { status: 400, headers: corsHeaders(origin) }
       );
     }
 
     if (!organization || organization.trim().length === 0) {
       return NextResponse.json(
         { error: 'Organization is required' },
-        { status: 400 }
+        { status: 400, headers: corsHeaders(origin) }
       );
     }
 
@@ -69,7 +75,7 @@ export async function POST(request: NextRequest) {
     if (!prompt_type || !['prompt1', 'prompt2', 'prompt3'].includes(prompt_type)) {
       return NextResponse.json(
         { error: 'Valid prompt_type is required (prompt1, prompt2, or prompt3)' },
-        { status: 400 }
+        { status: 400, headers: corsHeaders(origin) }
       );
     }
 
@@ -83,7 +89,7 @@ export async function POST(request: NextRequest) {
           error: 'Invalid image format',
           details: `Only JPEG/JPG and PNG formats are allowed. Received: ${image.type}`
         },
-        { status: 400 }
+        { status: 400, headers: corsHeaders(origin) }
       );
     }
 
@@ -94,7 +100,7 @@ export async function POST(request: NextRequest) {
           error: 'Image file too large',
           details: `Maximum file size is 2MB. Current size: ${(image.size / 1024 / 1024).toFixed(2)}MB`
         },
-        { status: 400 }
+        { status: 400, headers: corsHeaders(origin) }
       );
     }
 
@@ -414,7 +420,7 @@ export async function POST(request: NextRequest) {
       console.error('Database error:', dbError);
       return NextResponse.json(
         { error: 'Failed to save to database', details: dbError.message },
-        { status: 500 }
+        { status: 500, headers: corsHeaders(origin) }
       );
     }
 
@@ -447,7 +453,7 @@ export async function POST(request: NextRequest) {
       raw_ai_image_url: aiImagePresignedUrl, // Keep raw AI image separately
       final_image_url: finalImagePresignedUrl,
       download_url: downloadUrl
-    });
+    }, { headers: corsHeaders(origin) });
   } catch (error: any) {
     console.error('CRITICAL ERROR during generation:', error);
     // Log stack trace for Vercel logs
@@ -458,7 +464,7 @@ export async function POST(request: NextRequest) {
         error: error?.message || 'Internal Server Error',
         details: isProduction ? undefined : error?.stack
       },
-      { status: 500 }
+      { status: 500, headers: corsHeaders(request.headers.get('origin') || undefined) }
     );
   }
 }
