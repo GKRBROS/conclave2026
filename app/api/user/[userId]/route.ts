@@ -69,6 +69,7 @@ export async function GET(
             // 1. Get the ticket (merged image) from aws_key
             if (data.aws_key) {
                 finalImageUrl = await S3Service.getPresignedUrl(data.aws_key, 604800);
+                downloadUrl = await S3Service.getDownloadPresignedUrl(data.aws_key, `scaleup-ticket-${userId}.png`, 604800);
             }
 
             // 2. Get the raw AI image from generated_image_url
@@ -76,17 +77,14 @@ export async function GET(
                 const aiKey = data.generated_image_url;
                 if (aiKey && !aiKey.startsWith('http')) {
                     aiImageUrl = await S3Service.getPresignedUrl(aiKey, 604800);
-                    downloadUrl = await S3Service.getDownloadPresignedUrl(aiKey, `scaleup-ai-${data.id}.png`, 604800);
                 } else {
                     aiImageUrl = aiKey;
-                    downloadUrl = aiKey;
                 }
             }
 
-            // Fallbacks
+            // Fallbacks and alignment with user request (final image for preview and download)
             if (!finalImageUrl) finalImageUrl = aiImageUrl;
             if (!downloadUrl) downloadUrl = finalImageUrl;
-            if (!aiImageUrl) aiImageUrl = finalImageUrl;
 
         } catch (presignError) {
             console.warn('Failed to presign images:', presignError);
@@ -97,7 +95,8 @@ export async function GET(
             success: true,
             user_id: userId,
             final_image_url: finalImageUrl,
-            generated_image_url: aiImageUrl,
+            generated_image_url: finalImageUrl, // Use ticket for preview modal
+            raw_ai_image_url: aiImageUrl, // Keep raw AI image separately
             download_url: downloadUrl,
         }, {
             headers: {

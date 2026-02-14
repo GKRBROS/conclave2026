@@ -19,21 +19,21 @@ export async function POST(request: NextRequest) {
     if (!email || typeof email !== 'string') {
       return NextResponse.json(
         { error: 'Email is required' },
-        { status: 400 }
+        { status: 400, headers: corsHeaders(origin) }
       );
     }
 
     if (!otp || typeof otp !== 'string') {
       return NextResponse.json(
         { error: 'OTP is required' },
-        { status: 400 }
+        { status: 400, headers: corsHeaders(origin) }
       );
     }
 
     if (otp.length !== 6 || !/^\d{6}$/.test(otp)) {
       return NextResponse.json(
         { error: 'Invalid OTP format. Must be 6 digits.' },
-        { status: 400 }
+        { status: 400, headers: corsHeaders(origin) }
       );
     }
 
@@ -52,7 +52,7 @@ export async function POST(request: NextRequest) {
        console.error('Database error fetching verification:', fetchError);
        return NextResponse.json(
         { error: 'Database error. Please try again.' },
-        { status: 500 }
+        { status: 500, headers: corsHeaders(origin) }
       );
     }
 
@@ -60,7 +60,7 @@ export async function POST(request: NextRequest) {
       console.warn(`Verification record not found for: "${trimmedEmail}"`);
       return NextResponse.json(
         { error: 'No OTP found for this email address. Please request a new OTP.' },
-        { status: 404 }
+        { status: 404, headers: corsHeaders(origin) }
       );
     }
     
@@ -85,7 +85,7 @@ export async function POST(request: NextRequest) {
           error: 'OTP has expired. Please request a new OTP.',
           expired_at: verificationData.expires_at,
         },
-        { status: 400 }
+        { status: 400, headers: corsHeaders(origin) }
       );
     }
 
@@ -104,7 +104,7 @@ export async function POST(request: NextRequest) {
           error: 'Email already verified. Please request a new OTP to verify again.',
           verified_at: verificationData.verified_at,
         },
-        { status: 409 }
+        { status: 409, headers: corsHeaders(origin) }
       );
     }
 
@@ -116,7 +116,7 @@ export async function POST(request: NextRequest) {
           error: 'Too many failed attempts. Please request a new OTP.',
           max_attempts: MAX_ATTEMPTS,
         },
-        { status: 429 }
+        { status: 429, headers: corsHeaders(origin) }
       );
     }
 
@@ -137,7 +137,7 @@ export async function POST(request: NextRequest) {
           error: 'Invalid OTP',
           attempts_remaining: MAX_ATTEMPTS - newAttempts,
         },
-        { status: 400 }
+        { status: 400, headers: corsHeaders(origin) }
       );
     }
 
@@ -159,7 +159,7 @@ export async function POST(request: NextRequest) {
       console.error('Failed to update verification status:', updateError);
       return NextResponse.json(
         { error: 'Failed to update verification status' },
-        { status: 500 }
+        { status: 500, headers: corsHeaders(origin) }
       );
     }
 
@@ -186,37 +186,30 @@ export async function POST(request: NextRequest) {
         try {
             // aws_key is the ticket (merged image)
             const ticketSignedUrl = await S3Service.getPresignedUrl(user.aws_key, 604800, 'image/png');
+            const ticketDownloadUrl = await S3Service.getDownloadPresignedUrl(
+                user.aws_key, 
+                `scaleup-ticket-${user.id}.png`, 
+                604800, 
+                'image/png'
+            );
             
             // generated_image_url now stores the raw AI image key
-            let downloadUrl = ticketSignedUrl; // Fallback
-            let aiImageUrl = ticketSignedUrl; // Fallback
+            let aiImageUrl = ticketSignedUrl; // Fallback to ticket
 
             if (user.generated_image_url && !user.generated_image_url.startsWith('http')) {
-                console.log(`🖼️ Generating AI image download URL from key: ${user.generated_image_url}`);
+                console.log(`🖼️ Generating AI image URL from key: ${user.generated_image_url}`);
                 aiImageUrl = await S3Service.getPresignedUrl(user.generated_image_url, 604800, 'image/png');
-                downloadUrl = await S3Service.getDownloadPresignedUrl(
-                    user.generated_image_url, 
-                    `scaleup-ai-${user.id}.png`, 
-                    604800, 
-                    'image/png'
-                );
-            } else {
-                console.log(`⚠️ No raw AI image key found, using ticket for download`);
-                downloadUrl = await S3Service.getDownloadPresignedUrl(
-                    user.aws_key, 
-                    `scaleup-ticket-${user.id}.png`, 
-                    604800, 
-                    'image/png'
-                );
             }
 
-            user.generated_image_url = aiImageUrl;
+            // Set the fields for the response
+            user.raw_ai_image_url = aiImageUrl; // Keep raw AI image separately
+            user.generated_image_url = ticketSignedUrl; // Use ticket for preview modal
             user.final_image_url = ticketSignedUrl;
-            user.download_url = downloadUrl;
+            user.download_url = ticketDownloadUrl; // Download the ticket
             
             console.log(`✅ Signed URLs generated.`);
-            console.log(`   - Ticket (Preview): ${ticketSignedUrl.substring(0, 50)}...`);
-            console.log(`   - AI Image (Download): ${downloadUrl.substring(0, 50)}...`);
+            console.log(`   - Ticket (Preview/Download): ${ticketSignedUrl.substring(0, 50)}...`);
+            console.log(`   - AI Image (Raw): ${aiImageUrl.substring(0, 50)}...`);
         } catch (s3Error) {
             console.error('❌ Failed to generate signed URLs:', s3Error);
         }
@@ -233,7 +226,7 @@ export async function POST(request: NextRequest) {
       user: user,
       redirectTo: redirectTo,
       image_url: user?.generated_image_url || null, // Top-level for convenience
-    });
+    }, { headers: corsHeaders(origin) });
 
   } catch (error: any) {
     console.error('❌ Error verifying OTP:', error);
@@ -242,7 +235,7 @@ export async function POST(request: NextRequest) {
         error: 'Failed to verify OTP',
         details: error?.message || 'Unknown error',
       },
-      { status: 500 }
+      { status: 500, headers: corsHeaders(origin) }
     );
   }
 }

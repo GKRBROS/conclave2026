@@ -183,33 +183,26 @@ export async function POST(request: NextRequest) {
         try {
             // aws_key is the ticket (merged image)
             const ticketSignedUrl = await S3Service.getPresignedUrl(user.aws_key, 604800, 'image/png');
+            const ticketDownloadUrl = await S3Service.getDownloadPresignedUrl(
+                user.aws_key, 
+                `scaleup-ticket-${user.id}.png`, 
+                604800, 
+                'image/png'
+            );
             
             // generated_image_url now stores the raw AI image key
-            let downloadUrl = ticketSignedUrl; // Fallback
-            let aiImageUrl = ticketSignedUrl; // Fallback
+            let aiImageUrl = ticketSignedUrl; // Fallback to ticket
 
             if (user.generated_image_url && !user.generated_image_url.startsWith('http')) {
-                console.log(`🖼️ Generating AI image download URL from key: ${user.generated_image_url}`);
+                console.log(`🖼️ Generating AI image URL from key: ${user.generated_image_url}`);
                 aiImageUrl = await S3Service.getPresignedUrl(user.generated_image_url, 604800, 'image/png');
-                downloadUrl = await S3Service.getDownloadPresignedUrl(
-                    user.generated_image_url, 
-                    `scaleup-ai-${user.id}.png`, 
-                    604800, 
-                    'image/png'
-                );
-            } else {
-                console.log(`⚠️ No raw AI image key found, using ticket for download`);
-                downloadUrl = await S3Service.getDownloadPresignedUrl(
-                    user.aws_key, 
-                    `scaleup-ticket-${user.id}.png`, 
-                    604800, 
-                    'image/png'
-                );
             }
 
-            user.generated_image_url = aiImageUrl;
+            // Set the fields for the response
+            user.raw_ai_image_url = aiImageUrl; // Keep raw AI image separately
+            user.generated_image_url = ticketSignedUrl; // Use ticket for preview modal
             user.final_image_url = ticketSignedUrl;
-            user.download_url = downloadUrl;
+            user.download_url = ticketDownloadUrl; // Download the ticket
             
             console.log('✅ Signed URLs generated successfully');
         } catch (s3Error) {

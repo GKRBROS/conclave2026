@@ -520,7 +520,8 @@ export async function POST(request: NextRequest) {
           organization: organization.trim(),
           photo_url: uploadedImageUrl,
           generated_image_url: generatedKey || finalGeneratedUrl, // Store raw AI image key/URL
-          aws_key: finalKey, // Use the final merged image key
+          ai_image_key: generatedKey, // Also store in explicit AI image key column
+          aws_key: finalKey, // Store the final merged image key
           prompt_type: prompt_type,
           updated_at: new Date().toISOString()
         })
@@ -544,7 +545,8 @@ export async function POST(request: NextRequest) {
           organization: organization.trim(),
           photo_url: uploadedImageUrl,
           generated_image_url: generatedKey || finalGeneratedUrl, // Store raw AI image key/URL
-          aws_key: finalKey, // Use the final merged image key
+          ai_image_key: generatedKey, // Also store in explicit AI image key column
+          aws_key: finalKey, // Store the final merged image key
           prompt_type: prompt_type
         })
         .select()
@@ -591,28 +593,25 @@ export async function POST(request: NextRequest) {
 
     // Update the dbData with the presigned URLs for the response
     if (dbData) {
-      // Use the raw AI image for generated_image_url and download_url
-      // but keep the final merged image for final_image_url (the ticket)
+      // Step 8.1: Presign the raw AI image (stored in generated_image_url)
+      // We keep this for record-keeping, but the frontend primarily uses 
+      // final_image_url and download_url
       try {
         const aiKey = dbData.generated_image_url;
         if (aiKey && !aiKey.startsWith('http')) {
            dbData.generated_image_url = await S3Service.getPresignedUrl(aiKey, 604800);
-           // FIX: Ensure download_url uses the raw AI image key (aiKey)
-           dbData.download_url = await S3Service.getDownloadPresignedUrl(aiKey, `scaleup-ai-${uniqueId}.png`, 604800);
-        } else if (aiKey && aiKey.startsWith('http')) {
-           // If it's already a URL, use it
-           dbData.generated_image_url = aiKey;
-           dbData.download_url = aiKey;
-        } else {
-           // Fallback to final image if no AI image is found
-           dbData.download_url = finalImageDownloadUrl;
         }
       } catch (e) {
         console.warn('Failed to presign AI image for response:', e);
-        dbData.download_url = finalImageDownloadUrl;
       }
       
+      // Step 8.2: Set the preview and download URLs to the FINAL merged image (the ticket)
+      // This ensures the user sees and downloads the branded ticket, not the raw AI output
       dbData.final_image_url = finalImagePresignedUrl;
+      dbData.download_url = finalImageDownloadUrl;
+      
+      // If the frontend specifically uses generated_image_url for preview, 
+      // we might want to point it to the final image too, but let's see the response structure.
     }
 
     // Step 9: Send Email (Non-blocking)
@@ -675,7 +674,8 @@ export async function POST(request: NextRequest) {
         organization: dbData.organization,
         aws_key: dbData.aws_key,
         photo_url: uploadedImagePresignedUrl,
-        generated_image_url: dbData.generated_image_url || finalImagePresignedUrl,
+        generated_image_url: finalImagePresignedUrl, // Use ticket for preview modal
+        raw_ai_image_url: dbData.generated_image_url, // Keep raw AI image separately
         final_image_url: finalImagePresignedUrl,
         download_url: dbData.download_url || finalImageDownloadUrl
       },

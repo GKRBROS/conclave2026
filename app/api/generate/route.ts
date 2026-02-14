@@ -305,10 +305,12 @@ export async function POST(request: NextRequest) {
     const finalImagePath = await mergeImages(tempGeneratedFile, timestamp.toString(), name, organization);
 
     let finalImagePresignedUrl = finalImagePath;
+    let finalImageDownloadUrl = finalImagePath;
     let finalKey = '';
     try {
       finalKey = new URL(finalImagePath).pathname.replace(/^\//, '');
-      finalImagePresignedUrl = await S3Service.getPresignedUrl(finalKey, 3600);
+      finalImagePresignedUrl = await S3Service.getPresignedUrl(finalKey, 604800);
+      finalImageDownloadUrl = await S3Service.getDownloadPresignedUrl(finalKey, `scaleup-ticket-${timestamp}.png`, 604800);
     } catch (presignError) {
       console.warn('Failed to presign final image URL:', presignError);
       // Fallback: if it's not a URL, it might be the key
@@ -344,14 +346,15 @@ export async function POST(request: NextRequest) {
           const { data: updateData, error: updateError } = await supabase
             .from('generations')
             .update({
-              name: name.trim(),
-              organization: organization.trim(),
-              photo_url: uploadedImageUrl,
-              generated_image_url: generatedKey || finalGeneratedUrl, // Store raw AI image key/URL
-              aws_key: finalKey, // Store the final ticket key
-              prompt_type: prompt_type,
-              updated_at: new Date().toISOString()
-            })
+            name: name.trim(),
+            organization: organization.trim(),
+            photo_url: uploadedImageUrl,
+            generated_image_url: generatedKey || finalGeneratedUrl, // Store raw AI image key/URL
+            ai_image_key: generatedKey, // Also store in explicit AI image key column
+            aws_key: finalKey, // Store the final ticket key
+            prompt_type: prompt_type,
+            updated_at: new Date().toISOString()
+          })
           .eq('phone_no', phone_no.trim())
           .select()
           .single();
@@ -372,6 +375,7 @@ export async function POST(request: NextRequest) {
             organization: organization.trim(),
             photo_url: uploadedImageUrl,
             generated_image_url: generatedKey || finalGeneratedUrl, // Store raw AI image key/URL
+            ai_image_key: generatedKey, // Also store in explicit AI image key column
             aws_key: finalKey, // Store the final ticket key
             prompt_type: prompt_type
           })
@@ -395,6 +399,7 @@ export async function POST(request: NextRequest) {
           organization: organization.trim(),
           photo_url: uploadedImageUrl,
           generated_image_url: generatedKey || finalGeneratedUrl, // Store raw AI image key/URL
+          ai_image_key: generatedKey, // Also store in explicit AI image key column
           aws_key: finalKey, // Store the final ticket key
           prompt_type: prompt_type
         })
@@ -417,20 +422,19 @@ export async function POST(request: NextRequest) {
 
     // Prepare AI Image Presigned URL for response
     let aiImagePresignedUrl = finalGeneratedUrl;
-    let downloadUrl = finalImagePresignedUrl;
+    
     if (generatedKey) {
       try {
         aiImagePresignedUrl = await S3Service.getPresignedUrl(generatedKey, 604800);
-        // FIX: Use generatedKey (AI image) for downloadUrl instead of finalKey (ticket)
-        downloadUrl = await S3Service.getDownloadPresignedUrl(generatedKey, `scaleup-ai-${timestamp}.png`, 604800);
       } catch (e) {
         console.warn('Failed to presign AI image for response:', e);
       }
-    } else if (finalGeneratedUrl.startsWith('http')) {
-        // If we have a URL but no key, use it for both
-        aiImagePresignedUrl = finalGeneratedUrl;
-        downloadUrl = finalGeneratedUrl;
     }
+
+    // Set preview and download URLs to the FINAL merged image (the ticket)
+    // This ensures the user sees and downloads the branded ticket, not the raw AI output
+    const previewUrl = finalImagePresignedUrl;
+    const downloadUrl = finalImageDownloadUrl;
 
     return NextResponse.json({
       success: true,
@@ -439,7 +443,8 @@ export async function POST(request: NextRequest) {
       organization: dbData.organization,
       aws_key: finalKey,
       photo_url: uploadedImagePresignedUrl,
-      generated_image_url: aiImagePresignedUrl,
+      generated_image_url: previewUrl, // Use ticket for preview modal
+      raw_ai_image_url: aiImagePresignedUrl, // Keep raw AI image separately
       final_image_url: finalImagePresignedUrl,
       download_url: downloadUrl
     });
