@@ -25,8 +25,8 @@ const PROMPTS = {
 // ============================================
 // FILE UPLOAD CONSTRAINTS
 // ============================================
-const MAX_IMAGE_SIZE = 10 * 1024 * 1024; // 10MB maximum file size
-const ALLOWED_IMAGE_FORMATS = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp']; // Supported: JPEG, PNG, WEBP
+const MAX_IMAGE_SIZE = 2 * 1024 * 1024;
+const ALLOWED_IMAGE_FORMATS = ['image/jpeg', 'image/jpg', 'image/png'];
 
 // ============================================
 // FIELD VALIDATION PATTERNS
@@ -98,7 +98,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         {
           error: 'Image file too large',
-          details: `Maximum file size is 10MB. Current size: ${(image.size / 1024 / 1024).toFixed(2)}MB`
+          details: `Maximum file size is 2MB. Current size: ${(image.size / 1024 / 1024).toFixed(2)}MB`
         },
         { status: 400, headers: corsHeaders(origin) }
       );

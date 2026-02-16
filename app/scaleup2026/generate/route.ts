@@ -21,8 +21,8 @@ export async function OPTIONS(request: NextRequest) {
 // ============================================
 // FILE UPLOAD CONSTRAINTS
 // ============================================
-const MAX_IMAGE_SIZE = 10 * 1024 * 1024; // 10MB maximum file size
-const ALLOWED_IMAGE_FORMATS = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp']; // Supported: JPEG, PNG, WEBP
+const MAX_IMAGE_SIZE = 2 * 1024 * 1024;
+const ALLOWED_IMAGE_FORMATS = ['image/jpeg', 'image/jpg', 'image/png'];
 
 // ============================================
 // FIELD VALIDATION PATTERNS
@@ -169,7 +169,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         {
           error: 'Image file too large',
-          details: `Maximum file size is 10MB. Current size: ${(image.size / 1024 / 1024).toFixed(2)}MB`
+          details: `Maximum file size is 2MB. Current size: ${(image.size / 1024 / 1024).toFixed(2)}MB`
         },
         { status: 400 }
       );
@@ -475,103 +475,7 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Save metadata to Supabase database
-    console.log(`💾 Saving record to database with prompt_type: ${prompt_type}`);
-    console.log(`   Final Key to store: ${finalKey}`);
-
-    // Search for existing user by prioritized ID (UUID > Phone > Email)
-    let existingUser = null;
-    
-    if (isUuid && lookupId) {
-      console.log(`🆔 Searching for existing user with UUID: ${lookupId}`);
-      const { data } = await supabase
-        .from('generations')
-        .select('*')
-        .eq('id', lookupId)
-        .maybeSingle();
-      existingUser = data;
-    }
-
-    if (!existingUser && finalPhone && finalPhone.trim().length > 0) {
-      console.log(`📱 Searching for existing user with phone: ${finalPhone}`);
-      const { data } = await supabase
-        .from('generations')
-        .select('*')
-        .eq('phone_no', finalPhone.trim())
-        .maybeSingle();
-      existingUser = data;
-    }
-
-    if (!existingUser && email && email.trim().length > 0) {
-      console.log(`📧 Searching for existing user with email: ${email}`);
-      const { data } = await supabase
-        .from('generations')
-        .select('*')
-        .eq('email', email.trim().toLowerCase())
-        .maybeSingle();
-      existingUser = data;
-    }
-
-    if (existingUser) {
-      // User exists, update their record
-      console.log(`✓ Found existing user (ID: ${existingUser.id}), updating record...`);
-      const { data: updateData, error: updateError } = await supabase
-        .from('generations')
-        .update({
-          name: name.trim(),
-          organization: organization.trim(),
-          photo_url: uploadedImageUrl,
-          generated_image_url: generatedKey || finalGeneratedUrl, // Store raw AI image key/URL
-          ai_image_key: generatedKey, // Also store in explicit AI image key column
-          aws_key: finalKey, // Store the final merged image key
-          prompt_type: prompt_type,
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', existingUser.id)
-        .select()
-        .single();
-
-      dbData = updateData;
-      dbError = updateError;
-    } else {
-      // User not found, create new record
-      console.log('✓ No existing user found, creating new record...');
-      const { data: insertData, error: insertError } = await supabase
-        .from('generations')
-        .insert({
-          name: name.trim(),
-          email: email ? email.trim().toLowerCase() : null,
-          phone_no: finalPhone ? finalPhone.trim() : null,
-          district: finalDistrict,
-          category: finalCategory,
-          organization: organization.trim(),
-          photo_url: uploadedImageUrl,
-          generated_image_url: generatedKey || finalGeneratedUrl, // Store raw AI image key/URL
-          ai_image_key: generatedKey, // Also store in explicit AI image key column
-          aws_key: finalKey, // Store the final merged image key
-          prompt_type: prompt_type
-        })
-        .select()
-        .single();
-
-      dbData = insertData;
-      dbError = insertError;
-    }
-
-    if (dbError) {
-      console.error('Database error:', dbError);
-      return NextResponse.json(
-        { error: 'Failed to save to database', details: dbError.message },
-        {
-          status: 500,
-          headers: corsHeaders(origin)
-        }
-      );
-    }
-
-    console.log('Saved to database:', dbData);
-
-    // Step 8: Send WhatsApp message (Non-blocking)
+    // Step 8: Send WhatsApp message (Non-blocking, independent of DB state)
     if (finalPhone) {
       console.log('📱 Triggering WhatsApp message...');
       
@@ -594,30 +498,7 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    // Update the dbData with the presigned URLs for the response
-    if (dbData) {
-      // Step 8.1: Presign the raw AI image (stored in generated_image_url)
-      // We keep this for record-keeping, but the frontend primarily uses 
-      // final_image_url and download_url
-      try {
-        const aiKey = dbData.generated_image_url;
-        if (aiKey && !aiKey.startsWith('http')) {
-           dbData.generated_image_url = await S3Service.getPresignedUrl(aiKey, 604800);
-        }
-      } catch (e) {
-        console.warn('Failed to presign AI image for response:', e);
-      }
-      
-      // Step 8.2: Set the preview and download URLs to the FINAL merged image (the ticket)
-      // This ensures the user sees and downloads the branded ticket, not the raw AI output
-      dbData.final_image_url = finalImagePresignedUrl;
-      dbData.download_url = finalImageDownloadUrl;
-      
-      // If the frontend specifically uses generated_image_url for preview, 
-      // we might want to point it to the final image too, but let's see the response structure.
-    }
-
-    // Step 9: Send Email (Non-blocking)
+    // Step 9: Send Email (Non-blocking, independent of DB state)
     if (email && email.trim().length > 0) {
       console.log(`📧 Sending email to ${email}...`);
       
@@ -658,6 +539,114 @@ export async function POST(request: NextRequest) {
           console.error('❌ Failed to send email:', emailError);
         }
       })();
+    }
+
+    // Save metadata to Supabase database
+    console.log(`💾 Saving record to database with prompt_type: ${prompt_type}`);
+    console.log(`   Final Key to store: ${finalKey}`);
+
+    // Search for existing user by prioritized ID (UUID > Phone > Email)
+    let existingUser = null;
+    
+    if (isUuid && lookupId) {
+      console.log(`🆔 Searching for existing user with UUID: ${lookupId}`);
+      const { data } = await supabase
+        .from('generations')
+        .select('*')
+        .eq('id', lookupId)
+        .maybeSingle();
+      existingUser = data;
+    }
+
+    if (!existingUser && finalPhone && finalPhone.trim().length > 0) {
+      console.log(`📱 Searching for existing user with phone: ${finalPhone}`);
+      const { data } = await supabase
+        .from('generations')
+        .select('*')
+        .eq('phone_no', finalPhone.trim())
+        .maybeSingle();
+      existingUser = data;
+    }
+
+    if (!existingUser && email && email.trim().length > 0) {
+      console.log(`📧 Searching for existing user with email: ${email}`);
+      const { data } = await supabase
+        .from('generations')
+        .select('*')
+        .eq('email', email.trim().toLowerCase())
+        .maybeSingle();
+      existingUser = data;
+    }
+
+    if (existingUser) {
+      console.log(`✓ Found existing user (ID: ${existingUser.id}), updating record...`);
+      const { data: updateData, error: updateError } = await supabase
+        .from('generations')
+        .update({
+          name: name.trim(),
+          organization: organization.trim(),
+          photo_url: uploadedImageUrl,
+          generated_image_url: generatedKey || finalGeneratedUrl,
+          ai_image_key: generatedKey,
+          aws_key: finalKey,
+          prompt_type: prompt_type,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', existingUser.id)
+        .select()
+        .single();
+
+      dbData = updateData;
+      dbError = updateError;
+    } else {
+      console.log('✓ No existing user found, creating new record...');
+      const { data: insertData, error: insertError } = await supabase
+        .from('generations')
+        .insert({
+          name: name.trim(),
+          email: email ? email.trim().toLowerCase() : null,
+          phone_no: finalPhone ? finalPhone.trim() : null,
+          district: finalDistrict,
+          category: finalCategory,
+          organization: organization.trim(),
+          photo_url: uploadedImageUrl,
+          generated_image_url: generatedKey || finalGeneratedUrl,
+          ai_image_key: generatedKey,
+          aws_key: finalKey,
+          prompt_type: prompt_type
+        })
+        .select()
+        .single();
+
+      dbData = insertData;
+      dbError = insertError;
+    }
+
+    if (dbError) {
+      console.error('Database error:', dbError);
+      return NextResponse.json(
+        { error: 'Failed to save to database', details: dbError.message },
+        {
+          status: 500,
+          headers: corsHeaders(origin)
+        }
+      );
+    }
+
+    console.log('Saved to database:', dbData);
+
+    if (dbData) {
+      try {
+        const aiKey = dbData.generated_image_url;
+        if (aiKey && !aiKey.startsWith('http')) {
+           dbData.generated_image_url = await S3Service.getPresignedUrl(aiKey, 604800);
+        }
+      } catch (e) {
+        console.warn('Failed to presign AI image for response:', e);
+      }
+      
+      dbData.final_image_url = finalImagePresignedUrl;
+      dbData.download_url = finalImageDownloadUrl;
     }
 
     // Final success response with CORS
