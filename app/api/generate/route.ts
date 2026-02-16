@@ -83,18 +83,6 @@ export async function POST(request: NextRequest) {
     // IMAGE FILE VALIDATION
     // ============================================
     const fileExt = image.name ? image.name.toLowerCase().split('.').pop() || '' : '';
-    const isValidMime = ALLOWED_IMAGE_FORMATS.includes(image.type);
-    const isValidExt = ['jpg', 'jpeg', 'png'].includes(fileExt);
-
-    if (!isValidMime && !isValidExt) {
-      return NextResponse.json(
-        {
-          error: 'Invalid image format',
-          details: `Only JPEG/JPG and PNG formats are allowed. Received type: ${image.type || 'unknown'}, extension: ${fileExt || 'unknown'}`
-        },
-        { status: 400, headers: corsHeaders(origin) }
-      );
-    }
 
     // Constraint 2: Validate file size (max 2MB)
     if (image.size > MAX_IMAGE_SIZE) {
@@ -110,6 +98,37 @@ export async function POST(request: NextRequest) {
     // Proceed with processing
     const bytes = await image.arrayBuffer();
     const buffer = Buffer.from(bytes);
+
+    const isValidMime = ALLOWED_IMAGE_FORMATS.includes(image.type);
+    const isValidExt = ['jpg', 'jpeg', 'png'].includes(fileExt);
+
+    let isValidMagic = false;
+    if (buffer.length >= 4) {
+      const isJpeg =
+        buffer[0] === 0xff &&
+        buffer[1] === 0xd8;
+      const isPng =
+        buffer.length >= 8 &&
+        buffer[0] === 0x89 &&
+        buffer[1] === 0x50 &&
+        buffer[2] === 0x4e &&
+        buffer[3] === 0x47 &&
+        buffer[4] === 0x0d &&
+        buffer[5] === 0x0a &&
+        buffer[6] === 0x1a &&
+        buffer[7] === 0x0a;
+      isValidMagic = isJpeg || isPng;
+    }
+
+    if (!isValidMime && !isValidExt && !isValidMagic) {
+      return NextResponse.json(
+        {
+          error: 'Invalid image format',
+          details: `Only JPEG/JPG and PNG formats are allowed. Received type: ${image.type || 'unknown'}, extension: ${fileExt || 'unknown'}.`
+        },
+        { status: 400, headers: corsHeaders(origin) }
+      );
+    }
 
     const timestamp = Date.now();
     const fileExtension = image.name.split('.').pop() || 'jpg';
