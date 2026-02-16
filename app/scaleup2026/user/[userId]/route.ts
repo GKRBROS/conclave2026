@@ -72,15 +72,10 @@ export async function GET(
     if (!data.aws_key && !data.generated_image_url) {
       return NextResponse.json(
         {
-          error: 'Backend processing',
-          details: 'Image is being generated. Please wait and try retrieving the result.',
-          status: 504
+          error: 'Image not generated',
+          details: 'No generated image is available for this user yet.'
         },
-        { status: 202, headers: {
-          'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
-          'Pragma': 'no-cache',
-          'Expires': '0'
-        } }
+        { status: 404 }
       );
     }
 
