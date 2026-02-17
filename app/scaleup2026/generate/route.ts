@@ -6,6 +6,7 @@ import { mergeImages } from '@/lib/imageProcessor';
 import { supabaseAdmin } from '@/lib/supabase/admin';
 import { S3Service } from '@/lib/s3Service';
 import { corsHeaders, handleCorsOptions } from '@/lib/cors';
+import { PROMPTS } from '@/lib/prompts';
 import OpenAI from 'openai';
 import sharp from 'sharp';
 import { WhatsappService } from '@/lib/whatsappService';
@@ -29,11 +30,13 @@ const ALLOWED_IMAGE_FORMATS = ['image/jpeg', 'image/jpg', 'image/png'];
 // ============================================
 
 // Prompt templates
+/*
 const PROMPTS = {
   prompt1: 'Reimagine the uploaded person as a cinematic, high-end superhero portrait inspired by modern DC-style realism, rendered as an upper-body shot (cropped from just below the waist to just above the head) in a strict 4:5 aspect ratio. The subject is placed slightly off-center, facing diagonally upward, with the head subtly tilted up and to the side and eyes looking toward a bright light source above. The pose conveys calm strength and aspiration: chest slightly forward, shoulders relaxed, expression hopeful, confident, and composed with a soft, determined smile—heroic but never aggressive. Identity preservation is absolute: maintain exact facial structure, proportions, and likeness with no beautification or alteration, preserving all personal features precisely as in the source image, including glasses (same style and placement), piercings, jewelry, tattoos (same design and visibility), scars, moles, freckles, birthmarks, facial hair, age, gender, ethnicity, and body proportions.the thickness and length of the neck, shoulder width, and overall body build must remain natural and identical to the reference. Do not make the person slimmer, bulkier, or more athletic than they are. By default, the physique should read as that of a regular everyday person. Any culturally, religiously, or personally significant garments or coverings (e.g., hijab, turban, dupatta, headscarf, veil, cap, or modest clothing) must retain equivalent coverage and meaning, with the superhero suit intelligently adapted to integrate or accommodate them without removal or reinterpretation. The character wears a sleek, form-fitting deep blue superhero suit with premium textured fabric, realistic tension, and visible stitching, randomly styled as either cloth-based heroic, heavier power-driven, or tactical armored, featuring a bold red-and-yellow geometric chest emblem shaped as an upward-pointing arrow, seamlessly integrated. Lighting is dramatic and cinematic with strong rim light from above/behind, warm golden highlights wrapping the face and upper torso, subtle realistic glow and light streaks, smooth gradients, and accurate natural skin tones. Render in hyper-realistic, movie-poster quality with ultra-sharp facial detail, visible skin texture, shallow depth of field, and perfect subject focus. The background must be fully removed and delivered as a transparent PNG with a clean alpha channel (no halos or fringing), maintaining strict consistency in pose, framing, angle, and lighting, and output in true 4K resolution.',
   prompt2: 'Reimagine the uploaded person as a cinematic, high-end professional portrait with a heroic yet grounded presence, inspired by modern DC-style realism translated into a refined corporate aesthetic, presented as an upper-body portrait cropped from just below the waist to just above the head in a consistent 4:5 aspect ratio, with the subject placed slightly off-center make his arms-crossed positioning, natural arm overlap, upright stance, torso angle, shoulder alignment, and overall body orientation, while the head remains facing the camera to convey confidence, clarity, and calm authority; the posture is professional and composed with relaxed yet firm shoulders and the chest slightly forward, expressing quiet confidence, leadership, and optimism, and the facial expression remains hopeful, confident, and aspirational with a subtle, controlled smile and a calm, assured presence—never aggressive, exaggerated, or theatrical; identity preservation is critical, maintaining the person’s exact facial structure, proportions, and likeness with absolute accuracy, preserving all personal features exactly as they appear in the source image including glasses (same style, shape, and placement), nose rings, earrings, piercings, tattoos (same design, placement, and visibility), scars, moles, freckles, birthmarks, and facial hair, without adding, removing, stylizing, idealizing, beautifying, or altering any features beyond realistic cinematic lighting, and without changing age, gender, ethnicity, or body proportions; if the uploaded image includes culturally, religiously, or personally significant garments or coverings such as a hijab, turban, dupatta, headscarf, veil, cap, or modest or symbolic clothing, the final image must retain equivalent coverage and meaning, with the professional attire intelligently adapted to respect and integrate these elements without removal, reduction, or reinterpretation; the character wears a tailored, high-end professional suit that is sharp, modern, minimal, and executive in tone—such as a premium blazer with trousers or skirt—featuring realistic fabric texture, natural folds, subtle stitching, and precise fit in neutral or deep tones like charcoal, navy, black, or muted earth hues, free of flashy patterns or logos; lighting is dramatic yet refined with a strong cinematic rim light from above and behind, warm golden highlights softly wrapping around the face and shoulders, smooth gradients, and natural, accurate skin tones, rendered in a hyper-realistic, movie-poster-quality style with ultra-sharp facial detail, visible skin texture, shallow depth of field, and the subject perfectly in focus; the background must be completely removed and delivered as a transparent PNG with a clean alpha channel showing only the character, with crisp edges and no halos, fringing, or artifacts, maintaining strict consistency across generations in pose, angle, framing, and lighting, and output in true 4K resolution with ultra-detailed clarity.',
   prompt3: 'Reimagine the uploaded person as a cinematic, high-end medieval warrior portrait with a heroic yet grounded presence, inspired by epic historical realism and dramatic film aesthetics, presented as an upper-body portrait cropped from just below the waist to just above the head in a consistent 4:5 aspect ratio, with the subject placed slightly off-center and facing diagonally upward, the head subtly tilted up and to the side, eyes looking toward a soft but powerful elevated light source to convey strength, resolve, and calm authority; the pose is strong yet composed with relaxed shoulders, upright posture, and chest slightly forward, expressing quiet confidence, honor, and readiness without aggression, while the facial expression remains resolute, hopeful, and aspirational with a subtle, controlled expression and composed heroic presence—never savage or exaggerated; identity preservation is critical, maintaining the person’s exact facial structure, proportions, and likeness with absolute accuracy, preserving all personal features exactly as they appear in the source image including glasses (same style, shape, and placement), nose rings, earrings, piercings, tattoos (same design, placement, and visibility), scars, moles, freckles, birthmarks, and facial hair, without adding, removing, stylizing, idealizing, beautifying, or altering any features beyond realistic cinematic lighting, and without changing age, gender, ethnicity, or body proportions; if the uploaded image includes culturally, religiously, or personally significant garments or coverings such as a hijab, turban, dupatta, headscarf, veil, cap, or modest or symbolic clothing, the final image must retain equivalent coverage and meaning, with the medieval armor or garments intelligently adapted to integrate and respect these elements without removal, reduction, or reinterpretation; the character wears historically inspired medieval warrior attire such as layered leather, chainmail, or plate elements with realistic wear, engraved details, natural fabric tension, weathered textures, and functional construction, styled to feel authentic, grounded, and noble rather than fantasy-exaggerated or ornamental; lighting is dramatic and cinematic with a strong rim light from above and behind, warm torch-like highlights softly wrapping around the face and armor, subtle atmospheric glow, smooth gradients, and natural, accurate skin tones, rendered in a hyper-realistic, movie-poster-quality style with ultra-sharp facial detail, visible skin texture, shallow depth of field, and the subject perfectly in focus; the background must be completely removed and delivered as a transparent PNG with a clean alpha channel showing only the character, with crisp edges and no halos, fringing, or artifacts, maintaining strict consistency across generations in pose, angle, framing, and lighting, and output in true 4K resolution with ultra-detailed clarity.'
 };
+*/
 
 export async function POST(request: NextRequest) {
   const isProduction = process.env.NODE_ENV === 'production';
@@ -104,18 +107,20 @@ export async function POST(request: NextRequest) {
     const category = formData.get('category') as string | null;
     const organization = formData.get('organization') as string;
     let prompt_type = formData.get('prompt_type') as string;
+    const genderRaw = formData.get('gender') as string | null;
 
     const finalDistrict = district?.trim() || 'General';
     const finalCategory = category?.trim() || 'Startups';
 
-    console.log('Input data:', { 
-      name, 
-      email, 
-      finalPhone, 
+    console.log('Input data:', {
+      name,
+      email,
+      finalPhone,
       finalDistrict,
       finalCategory,
-      organization, 
+      organization,
       prompt_type,
+      gender: genderRaw,
       imageName: image?.name,
       imageSize: image?.size,
       imageType: image?.type
@@ -319,7 +324,15 @@ export async function POST(request: NextRequest) {
     const dataUrl = `data:image/jpeg;base64,${base64Image}`;
 
     // Call OpenRouter
-    const prompt = PROMPTS[prompt_type as keyof typeof PROMPTS];
+    const genderValue = (genderRaw || 'neutral').toLowerCase();
+    const gender =
+      genderValue === 'male' || genderValue === 'female' || genderValue === 'neutral'
+        ? genderValue
+        : 'neutral';
+    const promptKey = `${prompt_type}_${gender}` as keyof typeof PROMPTS;
+    const prompt =
+      (PROMPTS as any)[promptKey] ??
+      (PROMPTS as any)['prompt1_neutral'];
 
     const apiKey = process.env.OPENROUTER_API_KEY;
     if (!apiKey) {

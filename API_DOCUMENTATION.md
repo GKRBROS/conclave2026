@@ -10,6 +10,7 @@ This API handles user registration with avatar generation using AI. The system p
 
 - **ScaleUp 2026 Endpoint**: `/scaleup2026/generate` (POST) and `/scaleup2026/user/[userId]` (GET)
 - **API Endpoint**: `/api/generate` (POST) and `/api/user/[userId]` (GET)
+- **Flush Endpoint**: `/scaleup2026/flush` (POST)
 
 > Both endpoints have identical functionality. Use whichever matches your routing preference.
 
@@ -39,17 +40,20 @@ POST /api/generate
 | `category`     | string | ✅       | User category (e.g., Students, Business Owners, etc.)               |
 | `organization` | string | ✅       | Organization/company name (cannot be empty)                         |
 | `prompt_type`  | string | ✅       | Avatar style type (must be one of: `prompt1`, `prompt2`, `prompt3`) |
+| `gender`       | string | ❌       | One of `male`, `female`, `neutral` (defaults to `neutral`)         |
 | `photo`        | File   | ✅       | User's photo for avatar generation                                  |
 
 ### Avatar Style Types
 
-The `prompt_type` field defines which AI prompt is used:
+The `prompt_type` field defines which base AI prompt is used. The optional `gender` field further refines the prompt selection for that style.
 
 | Value     | Style            | Description                                             |
 | --------- | ---------------- | ------------------------------------------------------- |
 | `prompt1` | **Superman**     | Cinematic superhero portrait with bold, heroic presence |
 | `prompt2` | **Professional** | Corporate professional portrait with refined aesthetics |
 | `prompt3` | **Warrior**      | Medieval warrior portrait with historical authenticity  |
+
+When `gender` is provided, the backend combines `prompt_type` and `gender` into a key like `prompt1_male`, `prompt1_female`, or `prompt1_neutral`. If a gender-specific variant is not defined or an invalid combination is sent, the system safely falls back to a neutral superhero prompt (`prompt1_neutral`).
 
 ### File Upload Constraints
 
@@ -71,14 +75,14 @@ The `prompt_type` field defines which AI prompt is used:
 
 #### File Size Limit
 
-**Maximum Size**: **2 MB**
+**Maximum Size**: **5 MB**
 
 **Validation Error** (400):
 
 ```json
 {
   "error": "Image file too large",
-  "details": "Maximum file size is 2MB. Current size: 3.45MB"
+  "details": "Maximum file size is 5MB. Current size: 3.45MB"
 }
 ```
 
@@ -107,6 +111,7 @@ formData.append("district", "Mumbai");
 formData.append("category", "Working Professionals");
 formData.append("organization", "Tech Corp");
 formData.append("prompt_type", "prompt2");
+formData.append("gender", "male"); // or "female" or "neutral"
 formData.append("photo", fileInputElement.files[0]);
 
 const response = await fetch("/scaleup2026/generate", {
@@ -389,6 +394,85 @@ form.append("category", "Working Professionals");
 form.append("organization", "Test Org");
 form.append("prompt_type", "prompt2");
 form.append("photo" /* file blob */);
+```
+
+---
+
+## Flush Endpoint: Clear User Image Generation Data
+
+### Endpoint
+
+```
+POST /scaleup2026/flush
+```
+
+### Request Format
+
+**Content-Type**:
+- `application/json` **or**
+- `multipart/form-data`
+
+### Request Body
+
+| Field   | Type   | Required | Description                               |
+|-------- | ------ | -------- | ----------------------------------------- |
+| `email` | string | ✅       | User email used in the generations table |
+
+The endpoint looks up the most recent record in the `generations` table for the given email (case-insensitive) and clears image-related fields so the user can generate a new image.
+
+### Success Response (200)
+
+```json
+{
+  "success": true,
+  "message": "User image generation data flushed successfully",
+  "user_id": "550e8400-e29b-41d4-a716-446655440000",
+  "email": "user@example.com"
+}
+```
+
+### Error Responses
+
+#### Missing or Invalid Email (400)
+
+```json
+{
+  "error": "Email is required"
+}
+```
+
+or
+
+```json
+{
+  "error": "Invalid email format"
+}
+```
+
+#### User Not Found (404)
+
+```json
+{
+  "error": "User not found for provided email"
+}
+```
+
+#### Invalid JSON Body (400)
+
+```json
+{
+  "error": "Invalid JSON body",
+  "details": "Send a valid JSON object like {\"email\":\"user@example.com\"}."
+}
+```
+
+#### Server Error (500)
+
+```json
+{
+  "error": "Failed to flush user image data",
+  "details": "Error message from Supabase"
+}
 ```
 
 ---

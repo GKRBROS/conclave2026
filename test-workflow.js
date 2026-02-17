@@ -1,4 +1,3 @@
-const FormData = require('form-data');
 const fs = require('fs');
 const path = require('path');
 
@@ -26,21 +25,24 @@ async function testWorkflow() {
   form.append('category', 'Working Professionals');
   form.append('organization', 'Test Organization');
   form.append('prompt_type', 'prompt2');
-  form.append('photo', fs.createReadStream(testImagePath));
+  form.append('gender', 'male');
+  const fileBuffer = fs.readFileSync(testImagePath);
+  const fileBlob = new Blob([fileBuffer], { type: 'image/jpeg' });
+  form.append('photo', fileBlob, 'example.jpeg');
 
-  console.log('📤 Sending POST request to http://localhost:3002/api/generate\n');
+  console.log('📤 Sending POST request to http://localhost:3000/scaleup2026/generate\n');
   console.log('Request Parameters:');
   console.log('  - name: Test User');
   console.log('  - email: test@example.com');
   console.log('  - category: Working Professionals');
   console.log('  - organization: Test Organization');
-  console.log('  - prompt_type: prompt2\n');
+  console.log('  - prompt_type: prompt2');
+  console.log('  - gender: male\n');
 
   try {
-    const response = await fetch('http://localhost:3002/api/generate', {
+    const response = await fetch('http://localhost:3000/scaleup2026/generate', {
       method: 'POST',
       body: form,
-      headers: form.getHeaders(),
     });
 
     console.log('Response Status:', response.status, response.statusText);
@@ -59,7 +61,7 @@ async function testWorkflow() {
       
       // Test GET endpoint
       console.log('\n📤 Testing GET endpoint...');
-      const getResponse = await fetch(`http://localhost:3002/api/user/${data.user_id}`);
+      const getResponse = await fetch(`http://localhost:3000/scaleup2026/user/${data.user_id}`);
       const getData = await getResponse.json();
       console.log('\n📥 GET Response:');
       console.log(JSON.stringify(getData, null, 2));

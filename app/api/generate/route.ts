@@ -48,6 +48,7 @@ export async function POST(request: NextRequest) {
     const category = formData.get('category') as string | null;
     const organization = formData.get('organization') as string;
     const prompt_type = formData.get('prompt_type') as string;
+    const genderRaw = formData.get('gender') as string | null;
 
     // Field validations
     if (!image) {
@@ -185,7 +186,14 @@ export async function POST(request: NextRequest) {
     const dataUrl = `data:image/jpeg;base64,${base64Image}`;
 
     // Call OpenRouter
-    const prompt = PROMPTS[prompt_type as keyof typeof PROMPTS];
+    const genderValue = (genderRaw || 'neutral').toLowerCase();
+    const gender =
+      genderValue === 'male' || genderValue === 'female' || genderValue === 'neutral'
+        ? genderValue
+        : 'neutral';
+    const promptKey = `${prompt_type}_${gender}` as keyof typeof PROMPTS;
+    const prompt =
+      (PROMPTS as any)[promptKey] ?? PROMPTS[prompt_type as keyof typeof PROMPTS];
 
     const apiKey = process.env.OPENROUTER_API_KEY;
     if (!apiKey) {
