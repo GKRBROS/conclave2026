@@ -21,7 +21,7 @@ export async function OPTIONS(request: NextRequest) {
 // ============================================
 // FILE UPLOAD CONSTRAINTS
 // ============================================
-const MAX_IMAGE_SIZE = 2 * 1024 * 1024;
+const MAX_IMAGE_SIZE = 5 * 1024 * 1024;
 const ALLOWED_IMAGE_FORMATS = ['image/jpeg', 'image/jpg', 'image/png'];
 
 // ============================================
@@ -155,12 +155,12 @@ export async function POST(request: NextRequest) {
     // ============================================
     const fileExt = image.name ? image.name.toLowerCase().split('.').pop() || '' : '';
 
-    // Constraint 2: Validate file size (max 2MB)
+    // Constraint 2: Validate file size (max 5MB)
     if (image.size > MAX_IMAGE_SIZE) {
       return NextResponse.json(
         {
           error: 'Image file too large',
-          details: `Maximum file size is 2MB. Current size: ${(image.size / 1024 / 1024).toFixed(2)}MB`
+          details: `Maximum file size is 5MB. Current size: ${(image.size / 1024 / 1024).toFixed(2)}MB`
         },
         { status: 400 }
       );
@@ -330,9 +330,6 @@ export async function POST(request: NextRequest) {
     // Call OpenRouter
     console.log('Step 7: Sending request to OpenRouter...');
     console.log('  Model:', 'sourceful/riverflow-v2-fast-preview');
-    
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 120000); // 120 second timeout for AI call
 
     console.time('OpenRouter_AI_Call');
     const apiResponse = await fetch('https://openrouter.ai/api/v1/chat/completions', {
@@ -343,7 +340,6 @@ export async function POST(request: NextRequest) {
           'HTTP-Referer': 'https://github.com/GKRBROS/conclave2026',
           'X-Title': 'ScaleUp Conclave 2026',
         },
-        signal: controller.signal,
         body: JSON.stringify({
           model: 'sourceful/riverflow-v2-fast-preview',
           messages: [
@@ -358,8 +354,6 @@ export async function POST(request: NextRequest) {
           modalities: ['image']
         }),
       });
-
-      clearTimeout(timeoutId);
 
       if (!apiResponse.ok) {
       console.timeEnd('OpenRouter_AI_Call');
