@@ -12,13 +12,28 @@ export async function POST(request: NextRequest) {
   try {
     const contentType = request.headers.get('content-type') || '';
     let email: unknown;
+    let confirmFlag = false;
+
+    const parseConfirm = (value: any): boolean => {
+      if (typeof value === 'boolean') return value;
+      if (typeof value === 'number') return value === 1;
+      if (typeof value === 'string') {
+        const v = value.trim().toLowerCase();
+        return v === 'true' || v === '1' || v === 'yes' || v === 'y';
+      }
+      return false;
+    };
 
     if (contentType.includes('multipart/form-data')) {
       const formData = await request.formData();
       email = formData.get('email');
+      const confirmRaw = formData.get('confirm');
+      confirmFlag = parseConfirm(confirmRaw);
     } else {
       const body = await request.json();
       email = (body as any)?.email;
+      const confirmRaw = (body as any)?.confirm;
+      confirmFlag = parseConfirm(confirmRaw);
     }
 
     if (!email || typeof email !== 'string') {
@@ -42,7 +57,7 @@ export async function POST(request: NextRequest) {
 
     const { data: user, error: userError } = await supabase
       .from('generations')
-      .select('id, email, aws_key, generated_image_url, ai_image_key, photo_url')
+      .select('id, email, name, phone_no, aws_key, generated_image_url, ai_image_key, photo_url')
       .ilike('email', trimmedEmail)
       .order('created_at', { ascending: false })
       .limit(1)
@@ -59,6 +74,26 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         { error: 'User not found for provided email' },
         { status: 404, headers: corsHeaders(origin) }
+      );
+    }
+
+    if (!confirmFlag) {
+      return NextResponse.json(
+        {
+          success: true,
+          requires_confirmation: true,
+          message: 'User found. Confirm to flush image data.',
+          user: {
+            id: user.id,
+            email: user.email,
+            name: user.name,
+            phone_no: user.phone_no,
+            photo_url: user.photo_url,
+            generated_image_url: user.generated_image_url,
+            aws_key: user.aws_key,
+          },
+        },
+        { status: 200, headers: corsHeaders(origin) }
       );
     }
 

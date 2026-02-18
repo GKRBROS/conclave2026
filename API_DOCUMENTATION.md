@@ -414,22 +414,66 @@ POST /scaleup2026/flush
 
 ### Request Body
 
-| Field   | Type   | Required | Description                               |
-|-------- | ------ | -------- | ----------------------------------------- |
-| `email` | string | ✅       | User email used in the generations table |
+| Field      | Type    | Required | Description                                                                 |
+|----------- | ------- | -------- | --------------------------------------------------------------------------- |
+| `email`    | string  | ✅       | User email used in the generations table                                   |
+| `confirm`  | boolean | ❌       | When `true`, actually clears image data. When omitted/false, only previews |
 
-The endpoint looks up the most recent record in the `generations` table for the given email (case-insensitive) and clears image-related fields so the user can generate a new image.
+The flush flow is **two-step**:
 
-### Success Response (200)
+1. **Preview step (no deletion)**  
+   - Send only `email` (no `confirm` field).  
+   - The backend looks up the most recent record in the `generations` table for the given email (case-insensitive) and returns user details for confirmation.  
+   - Example request:
 
-```json
-{
-  "success": true,
-  "message": "User image generation data flushed successfully",
-  "user_id": "550e8400-e29b-41d4-a716-446655440000",
-  "email": "user@example.com"
-}
-```
+   ```json
+   {
+     "email": "user@example.com"
+   }
+   ```
+
+   **Preview response (200):**
+
+   ```json
+   {
+     "success": true,
+     "requires_confirmation": true,
+     "message": "User found. Confirm to flush image data.",
+     "user": {
+       "id": "550e8400-e29b-41d4-a716-446655440000",
+       "email": "user@example.com",
+       "name": "User Name",
+       "phone_no": "+919876543210",
+       "photo_url": "https://...",
+       "generated_image_url": "https://...",
+       "aws_key": "uploads/..."
+     }
+   }
+   ```
+
+2. **Confirm + delete step**  
+   - After the user confirms the previewed details are correct, send the same `email` with `confirm: true`.  
+   - The backend clears `photo_url`, `generated_image_url`, `ai_image_key`, and `aws_key` for that record and deletes any related OTP verification rows for that email.
+
+   Example request:
+
+   ```json
+   {
+     "email": "user@example.com",
+     "confirm": true
+   }
+   ```
+
+   **Success response (200):**
+
+   ```json
+   {
+     "success": true,
+     "message": "User image generation data flushed successfully",
+     "user_id": "550e8400-e29b-41d4-a716-446655440000",
+     "email": "user@example.com"
+   }
+   ```
 
 ### Error Responses
 
