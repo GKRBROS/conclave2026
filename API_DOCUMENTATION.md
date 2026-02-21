@@ -433,6 +433,146 @@ SUPABASE_SERVICE_ROLE_KEY=your_service_role_key
 
 ---
 
+## Analytics Endpoints
+
+### GET /analytics/overview
+
+Returns high-level overview metrics for dashboards.
+
+```bash
+GET /analytics/overview
+```
+
+#### Success Response (200)
+
+```json
+{
+  "success": true,
+  "overview": {
+    "totalImages": 1234,
+    "totalImagesLast7Days": 210,
+    "totalSessions": 1234,
+    "lastImageAt": "2026-02-20T12:34:56.789Z"
+  }
+}
+```
+
+---
+
+### Range Query Parameter
+
+The following analytics endpoints support the `range` query parameter:
+
+- `/analytics/views`
+- `/analytics/images`
+- `/analytics/users`
+
+Allowed values:
+
+- `daily` (default)
+- `weekly`
+- `monthly`
+
+Example:
+
+```bash
+GET /analytics/images?range=weekly
+```
+
+---
+
+### GET /analytics/views
+
+Returns time-series data of backend requests tracked by analytics middleware.
+
+```bash
+GET /analytics/views?range=daily|weekly|monthly
+```
+
+#### Success Response (200)
+
+```json
+{
+  "success": true,
+  "range": "daily",
+  "metrics": {
+    "series": [
+      { "key": "2026-02-01", "label": "2026-02-01", "value": 120 },
+      { "key": "2026-02-02", "label": "2026-02-02", "value": 180 }
+    ],
+    "total": 300,
+    "movingAverage": 150,
+    "latestValue": 180,
+    "growthPercentage": 50,
+    "isSpike": true
+  }
+}
+```
+
+---
+
+### GET /analytics/images
+
+Returns time-series data of generated images based on the `generations` table.
+
+```bash
+GET /analytics/images?range=daily|weekly|monthly
+```
+
+Shape is identical to `/analytics/views`.
+
+---
+
+### GET /analytics/users
+
+Returns time-series data of new users (based on first seen phone number).
+
+```bash
+GET /analytics/users?range=daily|weekly|monthly
+```
+
+Shape is identical to `/analytics/views`.
+
+---
+
+### GET /analytics/ai-insights
+
+Provides AI-related insights based on recent generations.
+
+```bash
+GET /analytics/ai-insights
+```
+
+#### Success Response (200)
+
+```json
+{
+  "success": true,
+  "insights": {
+    "topCategories": [
+      { "category": "Working Professionals", "count": 120 },
+      { "category": "Students", "count": 80 }
+    ],
+    "topPromptTypes": [
+      { "promptType": "prompt1", "count": 150 },
+      { "promptType": "prompt2", "count": 50 }
+    ],
+    "imageSeries": {
+      "series": [
+        { "key": "2026-02-01", "label": "2026-02-01", "value": 40 }
+      ],
+      "total": 40,
+      "movingAverage": 40,
+      "latestValue": 40,
+      "growthPercentage": null,
+      "isSpike": false
+    }
+  }
+}
+```
+
+---
+
 ## Rate Limiting & Timeouts
 
 - **Request Timeout**: 60 seconds (enough for AI generation)
