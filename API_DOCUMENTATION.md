@@ -275,6 +275,91 @@ curl -X GET "http://localhost:3000/scaleup2026/user/550e8400-e29b-41d4-a716-4466
 
 ---
 
+## GET Endpoint: Retrieve Final Image by Email
+
+### Endpoint
+
+```
+GET /scaleup2026/user/by-email
+```
+
+### Query Parameters
+
+| Parameter | Type   | Required | Description                             |
+| --------- | ------ | -------- | --------------------------------------- |
+| `email`   | string | ✅       | User email used in the generations table |
+
+### Example Request
+
+```bash
+curl -X GET "http://localhost:3000/scaleup2026/user/by-email?email=user@example.com"
+```
+
+### Success Response (200)
+
+```json
+{
+  "success": true,
+  "user_id": "550e8400-e29b-41d4-a716-446655440000",
+  "email": "user@example.com",
+  "final_image_url": "https://supabase-bucket.supabase.co/storage/v1/object/public/generated-images/uploads/1707000123456/merged-final.png",
+  "raw_ai_image_url": "https://supabase-bucket.supabase.co/storage/v1/object/public/generated-images/generated/generated-1707000123456.png",
+  "download_url": "https://supabase-bucket.supabase.co/storage/v1/object/public/generated-images/uploads/1707000123456/merged-final.png",
+  "user": {
+    "id": "550e8400-e29b-41d4-a716-446655440000",
+    "email": "user@example.com",
+    "name": "User Name",
+    "phone_no": "+919876543210"
+  }
+}
+```
+
+### Error Responses
+
+#### Missing Email (400)
+
+```json
+{
+  "error": "Email is required"
+}
+```
+
+#### Invalid Email Format (400)
+
+```json
+{
+  "error": "Invalid email format"
+}
+```
+
+#### User Not Found (404)
+
+```json
+{
+  "error": "User not found for provided email"
+}
+```
+
+#### Image Not Generated (404)
+
+```json
+{
+  "error": "Image not generated",
+  "details": "No generated image is available for this user yet."
+}
+```
+
+#### Database Error (500)
+
+```json
+{
+  "error": "Database error",
+  "details": "Error message from Supabase"
+}
+```
+
+---
+
 ## Database Schema
 
 ### `generations` Table
