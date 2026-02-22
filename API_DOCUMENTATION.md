@@ -451,6 +451,7 @@ GET /analytics/overview
   "overview": {
     "totalImages": 1234,
     "totalImagesLast7Days": 210,
+    "totalUsers": 456,
     "totalSessions": 1234,
     "lastImageAt": "2026-02-20T12:34:56.789Z"
   }

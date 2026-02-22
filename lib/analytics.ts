@@ -22,6 +22,7 @@ export type TimeSeriesMetrics = {
 export type OverviewMetrics = {
   totalImages: number;
   totalImagesLast7Days: number;
+  totalUsers: number;
   totalSessions: number;
   lastImageAt: string | null;
 };
@@ -123,7 +124,7 @@ export async function getImageTimeSeries(
 
   const { data, error } = await supabaseAdmin
     .from("generations")
-    .select("id, created_at")
+    .select("aws_key, created_at")
     .gte("created_at", from.toISOString());
 
   if (error) {
@@ -133,8 +134,9 @@ export async function getImageTimeSeries(
   const bucketMap = new Map<string, SeriesPoint>();
 
   for (const row of data || []) {
+    const awsKey = (row.aws_key as string | null) || "";
     const createdAt = row.created_at as string | null;
-    if (!createdAt) continue;
+    if (!createdAt || !awsKey) continue;
     const d = new Date(createdAt);
     const key = createBucketKey(d, range);
     const existing = bucketMap.get(key);
@@ -243,25 +245,37 @@ export async function getOverview(): Promise<OverviewMetrics> {
 
   const totalPromise = supabaseAdmin
     .from("generations")
-    .select("id", { count: "exact", head: true });
+    .select("id", { count: "exact", head: true })
+    .not("aws_key", "is", null)
+    .neq("aws_key", "");
 
   const recentPromise = supabaseAdmin
     .from("generations")
     .select("id", { count: "exact", head: true })
+    .not("aws_key", "is", null)
+    .neq("aws_key", "")
     .gte(
       "created_at",
       new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString()
     );
 
+  const usersPromise = supabaseAdmin
+    .from("generations")
+    .select("phone_no", { count: "exact", head: true })
+    .not("phone_no", "is", null);
+
   const lastImagePromise = supabaseAdmin
     .from("generations")
     .select("created_at")
+    .not("aws_key", "is", null)
+    .neq("aws_key", "")
     .order("created_at", { ascending: false })
     .limit(1);
 
-  const [totalRes, recentRes, lastImageRes] = await Promise.all([
+  const [totalRes, recentRes, usersRes, lastImageRes] = await Promise.all([
     totalPromise,
     recentPromise,
+    usersPromise,
     lastImagePromise,
   ]);
 
@@ -271,6 +285,7 @@ export async function getOverview(): Promise<OverviewMetrics> {
 
   const totalImages = totalRes.count ?? 0;
   const totalImagesLast7Days = recentRes.count ?? 0;
+  const totalUsers = usersRes.count ?? 0;
   const lastImageAtRow = (lastImageRes.data || [])[0] as
     | { created_at: string }
     | undefined;
@@ -281,6 +296,7 @@ export async function getOverview(): Promise<OverviewMetrics> {
   const overview: OverviewMetrics = {
     totalImages,
     totalImagesLast7Days,
+    totalUsers,
     totalSessions,
     lastImageAt,
   };
@@ -340,4 +356,3 @@ export async function getAiInsights(): Promise<AiInsights> {
   setCachedValue(cacheKey, insights, 120_000);
   return insights;
 }
-
