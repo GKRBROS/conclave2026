@@ -160,7 +160,7 @@ export async function POST(request: NextRequest) {
       });
 
       await transporter.sendMail({
-        from: process.env.SMTP_FROM || `"ScaleUp" <${process.env.SMTP_USER}>`,
+        from: process.env.SMTP_FROM || `"ScaleUp" <noreply@scaleupconclave.com>`,
         to: targetEmail,
         subject: 'ScaleUp Conclave - Your Verification Code',
         html,

@@ -32,7 +32,7 @@
         });
 
         await transporter.sendMail({
-          from: `"ScaleUp" <${process.env.SMTP_USER}>`,
+          from: process.env.SMTP_FROM || `"ScaleUp" <noreply@scaleupconclave.com>`,
           to,
           subject,
           html,

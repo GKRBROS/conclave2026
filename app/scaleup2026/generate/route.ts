@@ -559,7 +559,7 @@ export async function POST(request: NextRequest) {
           });
 
           await transporter.sendMail({
-            from: `"ScaleUp" <${process.env.SMTP_USER}>`,
+            from: process.env.SMTP_FROM || `"ScaleUp" <noreply@scaleupconclave.com>`,
             to: email,
             subject: 'ScaleUp Generated Avatar',
             html,
